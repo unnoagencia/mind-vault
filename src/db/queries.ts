@@ -59,9 +59,20 @@ export async function getEdgesTo(env: Env, id: string): Promise<EdgeRow[]> {
   return r.results ?? [];
 }
 
+function sanitizeFtsQuery(raw: string): string | null {
+  const tokens = raw
+    .split(/\s+/)
+    .map((t) => t.replace(/[^\p{L}\p{N}]/gu, ''))
+    .filter((t) => t.length > 0)
+    .map((t) => `"${t}"`);
+  return tokens.length === 0 ? null : tokens.join(' OR ');
+}
+
 export async function ftsSearch(
   env: Env, query: string, limit: number
 ): Promise<Array<Pick<NoteRow,'id'|'title'|'tldr'|'domains'|'kind'>>> {
+  const safe = sanitizeFtsQuery(query);
+  if (!safe) return [];
   const r = await env.DB.prepare(
     `SELECT n.id, n.title, n.tldr, n.domains, n.kind
      FROM notes_fts f
@@ -69,6 +80,6 @@ export async function ftsSearch(
      WHERE notes_fts MATCH ?
      ORDER BY rank
      LIMIT ?`
-  ).bind(query, limit).all<Pick<NoteRow,'id'|'title'|'tldr'|'domains'|'kind'>>();
+  ).bind(safe, limit).all<Pick<NoteRow,'id'|'title'|'tldr'|'domains'|'kind'>>();
   return r.results ?? [];
 }
