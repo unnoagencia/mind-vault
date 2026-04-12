@@ -4,6 +4,7 @@ import { registerRecall } from './tools/recall.js';
 import { registerExpand } from './tools/expand.js';
 import { registerGetNote } from './tools/get-note.js';
 import { registerLink } from './tools/link.js';
+import { registerReembed } from './tools/reembed.js';
 
 export function registerAllTools(server: any, env: Env): void {
   registerSaveNote(server, env);
@@ -11,4 +12,5 @@ export function registerAllTools(server: any, env: Env): void {
   registerExpand(server, env);
   registerGetNote(server, env);
   registerLink(server, env);
+  registerReembed(server, env);
 }
