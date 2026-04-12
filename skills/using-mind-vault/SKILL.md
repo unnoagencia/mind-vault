@@ -35,6 +35,26 @@ ALWAYS call `MindVault:recall` before `MindVault:save_note`, even when you think
 ### 4. Edge discipline
 Every edge needs a substantive `why` — a sentence naming the shared MECHANISM. If you can't write the why, don't create the edge.
 
+## Language policy
+
+The vault is language-agnostic by design. Write `title`, `body`, and `tldr` in whichever language the user is speaking — if the conversation is in Portuguese, save in Portuguese; if in English, save in English; if mixed, pick the dominant one. The embedding model (`bge-m3`) is multilingual and retrieves across languages, so a Portuguese note can surface on an English query and vice versa.
+
+The ONE exception is the `domains` field: always use canonical English kebab-case slugs (e.g. `evolutionary-biology`, `behavioral-economics`, `systems-thinking`), regardless of conversation language. Domains are schema, not content — they need to be stable identifiers that do not drift with the speaker.
+
+## Domain naming convention
+
+Every entry in `domains[]` must match `^[a-z][a-z0-9-]{1,39}$` — lowercase ASCII, 2-40 characters, kebab-case. No accented characters, no spaces, no uppercase, no underscores, no translations.
+
+Good examples, across fields:
+- Biology: `evolutionary-biology`, `molecular-genetics`, `ecology`
+- Economics: `behavioral-economics`, `game-theory`, `public-finance`
+- Engineering: `software-engineering`, `distributed-systems`, `embedded-systems`
+- Philosophy: `philosophy-of-mind`, `epistemology`, `virtue-ethics`
+- History: `military-history`, `economic-history`, `history-of-science`
+- Systems thinking: `systems-thinking`, `feedback-loops`, `complexity`
+
+Bad examples that will be rejected: `Evolutionary-Biology` (uppercase), `evolutionary biology` (space), `evolutionary_biology` (underscore), `1biology` (leading digit), `biologia-evolutiva-avançada` (accented). Note: `biologia-evolutiva` passes the regex because it is syntactically valid kebab-case — but you must NOT use it. The server cannot syntactically distinguish Portuguese from English at this level, so this is load-bearing on your discipline. Always translate mentally to the canonical English slug.
+
 ## Save workflow
 
 ~~~
