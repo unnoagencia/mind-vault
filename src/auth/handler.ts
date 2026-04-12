@@ -59,32 +59,69 @@ async function handleCredentials(req: Request): Promise<Response> {
   const hashCmd = `wrangler secret put OWNER_PASSWORD_HASH`;
 
   return new Response(
-    `<!doctype html><html><head><meta charset="utf-8"><title>Mind Vault — Credenciais</title><style>${BASE_CSS}</style></head>
+    `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mind Vault — Credenciais</title><style>${BASE_CSS}</style></head>
 <body><main>
   <h1>Credenciais geradas</h1>
-  <p>Cole os valores abaixo nos secrets do Worker. Ainda não dá pra escrever secrets a partir do próprio Worker, então isso é um passo manual — rode os comandos no seu terminal, um de cada vez, e cole os valores quando o wrangler pedir.</p>
+  <p>Cole os valores abaixo nos secrets do Worker. Como o próprio Worker não consegue escrever secrets em si mesmo, esse passo é manual — rode os comandos no terminal, um de cada vez, e cole o valor quando o wrangler pedir.</p>
 
   <div class="card">
     <h2>1. Email</h2>
     <p>Comando: <code>${esc(emailCmd)}</code></p>
-    <p>Valor: <code id="email">${esc(email)}</code></p>
-    <button onclick="navigator.clipboard.writeText(document.getElementById('email').innerText)">Copiar email</button>
+    <p>Valor:</p>
+    <pre id="email-value">${esc(email)}</pre>
+    <button type="button" data-copy="email-value">Copiar email</button>
   </div>
 
   <div class="card">
-    <h2>2. Hash da passphrase (argon2id)</h2>
+    <h2>2. Hash da passphrase (PBKDF2-SHA256, 100k iter)</h2>
     <p>Comando: <code>${esc(hashCmd)}</code></p>
     <p>Valor:</p>
-    <pre id="hash">${esc(hash)}</pre>
-    <button onclick="navigator.clipboard.writeText(document.getElementById('hash').innerText)">Copiar hash</button>
+    <pre id="hash-value">${esc(hash)}</pre>
+    <button type="button" data-copy="hash-value">Copiar hash</button>
   </div>
 
   <div class="card">
     <h2>3. Redeploy</h2>
-    <p>Depois dos dois <code>wrangler secret put</code>, rode <code>wrangler deploy</code> uma vez pra o Worker ler os secrets. A próxima visita à home vai mostrar o status do cofre em vez deste wizard.</p>
+    <p>Depois dos dois <code>wrangler secret put</code>, rode <code>wrangler deploy</code> uma vez para o Worker enxergar os novos secrets. A próxima visita à home vai mostrar o status do cofre em vez deste wizard, e <code>/authorize</code> vai renderizar a tela de login em vez de "Vault not configured".</p>
   </div>
 
-  <p><a href="/">← Voltar</a></p>
+  <p><a href="/">← Voltar ao wizard</a></p>
+
+  <script>
+    async function copyText(text) {
+      if (navigator.clipboard && window.isSecureContext) {
+        try { await navigator.clipboard.writeText(text); return true; } catch (_) {}
+      }
+      // Fallback: textarea + execCommand (works even fora de secure context)
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (_) {}
+      document.body.removeChild(ta);
+      return ok;
+    }
+    document.querySelectorAll('button[data-copy]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-copy');
+        const el = document.getElementById(id);
+        if (!el) return;
+        const text = (el.textContent || '').trim();
+        const ok = await copyText(text);
+        const original = btn.textContent;
+        btn.textContent = ok ? 'Copiado ✓' : 'Selecione o texto e Ctrl+C';
+        btn.style.background = ok ? '#4caf50' : '#ff9800';
+        setTimeout(() => {
+          btn.textContent = original;
+          btn.style.background = '';
+        }, 1800);
+      });
+    });
+  <\/script>
 </main></body></html>`,
     { headers: { 'content-type': 'text/html; charset=utf-8' } }
   );
