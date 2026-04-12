@@ -48,7 +48,7 @@ async function handleCredentials(req: Request): Promise<Response> {
   const form = await req.formData();
   const email = String(form.get('email') ?? '').trim();
   const password = String(form.get('password') ?? '');
-  const password2 = String(form.get('password2') ?? '');
+  const password2 = String(form.get('password_confirm') ?? form.get('password2') ?? '');
 
   if (!email || !password) return renderCredentialsError('Email e passphrase são obrigatórios.');
   if (password.length < 12) return renderCredentialsError('Passphrase precisa de pelo menos 12 caracteres.');
