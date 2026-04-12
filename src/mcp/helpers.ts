@@ -22,12 +22,12 @@ export function safeToolHandler<A extends unknown[]>(
       if (msg.includes('D1_ERROR') || msg.includes('SQLITE_ERROR')) {
         console.error('MindVault D1 error:', msg);
         return toolError(
-          `Erro interno no banco (D1) do cofre. Provavelmente temporário — aguarde alguns segundos e tente novamente. ` +
-          `Se persistir, reporte o horário ${new Date().toISOString()} e a ação tentada ao mantenedor.`
+          `Internal error in the vault database (D1). Probably transient — wait a few seconds and try again. ` +
+          `If it persists, report the timestamp ${new Date().toISOString()} and the attempted action to the maintainer.`
         );
       }
       console.error('MindVault tool error:', msg);
-      return toolError(`Erro inesperado: ${msg}. Verifique o input e tente novamente.`);
+      return toolError(`Unexpected error: ${msg}. Check the input and try again.`);
     }
   };
 }

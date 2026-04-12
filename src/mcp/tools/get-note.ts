@@ -5,11 +5,11 @@ import { getEdgesFrom, getEdgesTo, getNoteById, getTagsByNote } from '../../db/q
 
 const inputSchema = { id: z.string().min(1) };
 
-const DESCRIPTION = `Busca o conteúdo completo de uma nota por id (body + tags + edges).
+const DESCRIPTION = `Fetch the full content of a note by id (body + tags + edges).
 
-FLUXO: chame recall() antes para descobrir o id correto. Não invente ids.
+FLOW: call recall() first to discover the id. Do not invent ids.
 
-IMPORTANTE: o body retornado pode ser extenso — cite os trechos relevantes, não despeje o conteúdo inteiro na resposta ao usuário. Se você não tem certeza de qual nota puxar, prefira recall() + expand() antes de recorrer a get_note.`;
+IMPORTANT: the body can be long — cite the relevant passages in your reply, do not dump the entire content back to the user. If you are not sure which note to pull, prefer recall() + expand() before falling back to get_note.`;
 
 export function registerGetNote(server: any, env: Env): void {
   server.registerTool(
@@ -23,7 +23,7 @@ export function registerGetNote(server: any, env: Env): void {
       const n = await getNoteById(env, input.id);
       if (!n) {
         return toolError(
-          `Note '${input.id}' não encontrada. Chame recall() para descobrir o id correto. Não retente com este id.`
+          `Note '${input.id}' not found. Call recall() to discover the correct id. Do NOT retry with this id.`
         );
       }
       const [tags, edgesOut, edgesIn] = await Promise.all([

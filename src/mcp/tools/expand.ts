@@ -9,14 +9,14 @@ const inputSchema = {
   direction: z.enum(['in','out','both']).optional().default('both'),
 };
 
-const DESCRIPTION = `Vizinhos imediatos (1 hop) de uma nota no grafo.
+const DESCRIPTION = `Immediate neighbors (1 hop) of a note in the graph.
 
-FLUXO: chame recall() antes para descobrir o note_id. Não chame expand com um id inventado.
+FLOW: call recall() first to discover the note_id. Do not call expand with an invented id.
 
-Retorna {neighbors: [{note, edge}]} onde edge inclui relation_type e why.
-Para navegar mais fundo, chame expand recursivamente nos ids retornados — mas pense duas vezes antes de expandir mais de 2 hops, costuma ser ruído.
+Returns {neighbors: [{note, edge}]} where edge includes relation_type and why.
+To navigate deeper, call expand recursively on the returned ids — but think twice before going more than 2 hops, it is usually noise.
 
-IMPORTANTE: se recall já traz a analogia que você precisa, não chame expand só por reflexo. Use expand quando quiser seguir uma linha de raciocínio específica pelo grafo.`;
+IMPORTANT: if recall already surfaces the analogy you need, do not reflexively call expand. Use expand when you want to follow a specific reasoning line through the graph.`;
 
 interface ExpandInput {
   note_id: string;
@@ -36,7 +36,7 @@ export function registerExpand(server: any, env: Env): void {
       const base = await getNoteById(env, input.note_id);
       if (!base) {
         return toolError(
-          `Note '${input.note_id}' não encontrada. Chame recall() primeiro para descobrir o id correto. Não retente com este id.`
+          `Note '${input.note_id}' not found. Call recall() first to discover the correct id. Do NOT retry with this id.`
         );
       }
       const dir = input.direction ?? 'both';

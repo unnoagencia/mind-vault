@@ -16,6 +16,6 @@ describe('helpers', () => {
     const h = safeToolHandler(async () => { throw new Error('D1_ERROR: something'); });
     const r = await h();
     expect((r as any).isError).toBe(true);
-    expect((r as any).content[0].text).toContain('banco');
+    expect((r as any).content[0].text).toContain('vault database');
   });
 });

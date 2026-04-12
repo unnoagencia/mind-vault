@@ -11,13 +11,13 @@ const inputSchema = {
   why: z.string(),
 };
 
-const DESCRIPTION = `Cria uma aresta entre duas notas existentes.
+const DESCRIPTION = `Create an edge between two existing notes.
 
-Use APENAS quando ambas as notas já existem e você descobre uma conexão nova durante a conversa. Se você está criando um conceito novo, NÃO use link — use save_note com edges, é mais barato.
+Use ONLY when both notes already exist and you discover a new connection during the conversation. If you are creating a new concept, do NOT use link — use save_note with edges, it is cheaper.
 
-FLUXO: chame recall() para confirmar os ids de ambas as notas antes de chamar link. Self-loops (from_id == to_id) são rejeitados.
+FLOW: call recall() to confirm the ids of both notes before calling link. Self-loops (from_id == to_id) are rejected.
 
-IMPORTANTE: why mínimo 20 caracteres, explicando o MECANISMO compartilhado, não só "relacionados". Edges duplicadas (mesmo from_id, to_id, relation_type) são silenciosamente ignoradas.`;
+IMPORTANT: why minimum 20 characters, naming the shared MECHANISM, not just "related". Duplicate edges (same from_id, to_id, relation_type) are silently ignored.`;
 
 interface LinkInput {
   from_id: string;
@@ -37,14 +37,14 @@ export function registerLink(server: any, env: Env): void {
     safeToolHandler(async (input: LinkInput) => {
       if (input.from_id === input.to_id) {
         return toolError(
-          `Não é possível criar uma edge de uma nota para ela mesma. ` +
-          `Se o objetivo é marcar tensão interna, crie uma nova nota refinando o conceito e ligue as duas com 'refines' ou 'contradicts'.`
+          `Cannot create an edge from a note to itself. ` +
+          `If the goal is to capture internal tension, create a new note refining the concept and link the two with 'refines' or 'contradicts'.`
         );
       }
       if (input.why.length < 20) {
         return toolError(
-          `A justificativa (why) tem apenas ${input.why.length} caracteres — mínimo 20. ` +
-          `Explique o MECANISMO compartilhado, não apenas que as notas se relacionam.`
+          `The why field has only ${input.why.length} characters — minimum is 20. ` +
+          `Explain the shared MECHANISM, not just that the notes are related.`
         );
       }
       const [from, to] = await Promise.all([
@@ -52,10 +52,10 @@ export function registerLink(server: any, env: Env): void {
         getNoteById(env, input.to_id),
       ]);
       if (!from) {
-        return toolError(`Note '${input.from_id}' não encontrada. Chame recall() para descobrir o id correto. Não retente com este id.`);
+        return toolError(`Note '${input.from_id}' not found. Call recall() to discover the correct id. Do NOT retry with this id.`);
       }
       if (!to) {
-        return toolError(`Note '${input.to_id}' não encontrada. Chame recall() para descobrir o id correto. Não retente com este id.`);
+        return toolError(`Note '${input.to_id}' not found. Call recall() to discover the correct id. Do NOT retry with this id.`);
       }
       const id = newId();
       await insertEdge(env, {

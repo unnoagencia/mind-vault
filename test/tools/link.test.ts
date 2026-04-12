@@ -30,7 +30,7 @@ describe('link', () => {
   it('rejects self-loop', async () => {
     const r = await reg().link({ from_id: 'a', to_id: 'a', relation_type: 'analogous_to', why: 'shared feedback-loop mechanism substantive text' });
     expect(r.isError).toBe(true);
-    expect(r.content[0].text).toContain('para ela mesma');
+    expect(r.content[0].text).toContain('itself');
   });
 
   it('rejects short why', async () => {
