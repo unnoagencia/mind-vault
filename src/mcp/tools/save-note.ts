@@ -28,10 +28,10 @@ FLUXO OBRIGATÓRIO antes de chamar:
 2. Chame recall() primeiro para varredura cross-domain. Mesmo que você ache que a ideia é inédita.
 3. Para cada analogia em OUTRO domínio, inclua uma edge no array edges desta mesma chamada.
 
-O campo tldr é um teste de Feynman: se você não consegue resumir em uma frase concreta, a nota não está pronta.
+O campo tldr é um teste de Feynman: se você não consegue resumir em uma frase concreta, a nota NÃO está pronta — não force, converse mais com o usuário até ter clareza. NÃO chame save_note sem um tldr concreto.
 O campo domains deve ser ESPECÍFICO (evolutionary-biology, não science).
 
-IMPORTANTE: o campo why de cada edge é rejeitado se tiver menos de 20 caracteres.`;
+IMPORTANTE: o campo why de cada edge é rejeitado se tiver menos de 20 caracteres, e edges apontando para ids inexistentes são rejeitadas. Se você não tem o id da nota alvo, chame recall() primeiro.`;
 
 interface SaveNoteInput {
   title: string;

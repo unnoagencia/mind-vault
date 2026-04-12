@@ -7,7 +7,9 @@ const inputSchema = { id: z.string().min(1) };
 
 const DESCRIPTION = `Busca o conteúdo completo de uma nota por id (body + tags + edges).
 
-Use quando você precisa ler/citar o conteúdo integral de uma nota encontrada via recall.`;
+FLUXO: chame recall() antes para descobrir o id correto. Não invente ids.
+
+IMPORTANTE: o body retornado pode ser extenso — cite os trechos relevantes, não despeje o conteúdo inteiro na resposta ao usuário. Se você não tem certeza de qual nota puxar, prefira recall() + expand() antes de recorrer a get_note.`;
 
 export function registerGetNote(server: any, env: Env): void {
   server.registerTool(

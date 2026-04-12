@@ -13,8 +13,11 @@ const inputSchema = {
 
 const DESCRIPTION = `Cria uma aresta entre duas notas existentes.
 
-Use quando você descobre uma conexão entre notas antigas durante a conversa, sem criar nota nova.
-IMPORTANTE: why mínimo 20 caracteres, explicando o MECANISMO compartilhado.`;
+Use APENAS quando ambas as notas já existem e você descobre uma conexão nova durante a conversa. Se você está criando um conceito novo, NÃO use link — use save_note com edges, é mais barato.
+
+FLUXO: chame recall() para confirmar os ids de ambas as notas antes de chamar link. Self-loops (from_id == to_id) são rejeitados.
+
+IMPORTANTE: why mínimo 20 caracteres, explicando o MECANISMO compartilhado, não só "relacionados". Edges duplicadas (mesmo from_id, to_id, relation_type) são silenciosamente ignoradas.`;
 
 interface LinkInput {
   from_id: string;

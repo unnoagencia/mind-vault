@@ -29,7 +29,7 @@ export async function insertNote(env: Env, n: NoteRow): Promise<void> {
 
 export async function insertEdge(env: Env, e: EdgeRow): Promise<void> {
   await env.DB.prepare(
-    `INSERT INTO edges (id,from_id,to_id,relation_type,why,created_at)
+    `INSERT OR IGNORE INTO edges (id,from_id,to_id,relation_type,why,created_at)
      VALUES (?,?,?,?,?,?)`
   ).bind(e.id, e.from_id, e.to_id, e.relation_type, e.why, e.created_at).run();
 }

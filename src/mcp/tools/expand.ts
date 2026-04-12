@@ -11,8 +11,12 @@ const inputSchema = {
 
 const DESCRIPTION = `Vizinhos imediatos (1 hop) de uma nota no grafo.
 
+FLUXO: chame recall() antes para descobrir o note_id. Não chame expand com um id inventado.
+
 Retorna {neighbors: [{note, edge}]} onde edge inclui relation_type e why.
-Para navegar mais fundo, chame expand recursivamente nos ids retornados.`;
+Para navegar mais fundo, chame expand recursivamente nos ids retornados — mas pense duas vezes antes de expandir mais de 2 hops, costuma ser ruído.
+
+IMPORTANTE: se recall já traz a analogia que você precisa, não chame expand só por reflexo. Use expand quando quiser seguir uma linha de raciocínio específica pelo grafo.`;
 
 interface ExpandInput {
   note_id: string;

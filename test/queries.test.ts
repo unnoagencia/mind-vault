@@ -32,9 +32,8 @@ describe('queries', () => {
       domains:JSON.stringify(['military-history']),kind:null,created_at:1,updated_at:1,
     });
     await insertEdge(E, { id:'e1',from_id:'n1',to_id:'n2',relation_type:'analogous_to',why:'same coevolutionary pressure dynamic',created_at:1 });
-    await expect(
-      insertEdge(E,{ id:'e2',from_id:'n1',to_id:'n2',relation_type:'analogous_to',why:'same coevolutionary pressure dynamic',created_at:1 })
-    ).rejects.toThrow();
+    // Duplicate is silently ignored (INSERT OR IGNORE) so save_note partial-writes can't happen
+    await insertEdge(E, { id:'e2',from_id:'n1',to_id:'n2',relation_type:'analogous_to',why:'same coevolutionary pressure dynamic',created_at:1 });
     expect((await getEdgesFrom(E,'n1')).length).toBe(1);
   });
 

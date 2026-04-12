@@ -1,6 +1,6 @@
 import type { Env } from '../env.js';
 import { handleRoot, handleProvision, isSetup } from './setup.js';
-import { verifyPassword } from './password.js';
+import { hashPassword, verifyPassword } from './password.js';
 import { BASE_CSS } from '../static/styles.js';
 import { esc } from '../util/html.js';
 
@@ -10,6 +10,7 @@ export const authHandler = {
 
     if (url.pathname === '/') return handleRoot(req, env);
     if (url.pathname === '/setup/provision' && req.method === 'POST') return handleProvision(env);
+    if (url.pathname === '/setup/credentials' && req.method === 'POST') return handleCredentials(req);
 
     if (url.pathname === '/skill/using-mind-vault.zip') {
       return env.ASSETS.fetch(new Request(new URL('/using-mind-vault.zip', url.origin)));
@@ -42,6 +43,60 @@ export const authHandler = {
     return new Response('Not found', { status: 404 });
   },
 };
+
+async function handleCredentials(req: Request): Promise<Response> {
+  const form = await req.formData();
+  const email = String(form.get('email') ?? '').trim();
+  const password = String(form.get('password') ?? '');
+  const password2 = String(form.get('password2') ?? '');
+
+  if (!email || !password) return renderCredentialsError('Email e passphrase são obrigatórios.');
+  if (password.length < 12) return renderCredentialsError('Passphrase precisa de pelo menos 12 caracteres.');
+  if (password !== password2) return renderCredentialsError('Confirmação não confere com a passphrase.');
+
+  const hash = await hashPassword(password);
+  const emailCmd = `wrangler secret put OWNER_EMAIL`;
+  const hashCmd = `wrangler secret put OWNER_PASSWORD_HASH`;
+
+  return new Response(
+    `<!doctype html><html><head><meta charset="utf-8"><title>Mind Vault — Credenciais</title><style>${BASE_CSS}</style></head>
+<body><main>
+  <h1>Credenciais geradas</h1>
+  <p>Cole os valores abaixo nos secrets do Worker. Ainda não dá pra escrever secrets a partir do próprio Worker, então isso é um passo manual — rode os comandos no seu terminal, um de cada vez, e cole os valores quando o wrangler pedir.</p>
+
+  <div class="card">
+    <h2>1. Email</h2>
+    <p>Comando: <code>${esc(emailCmd)}</code></p>
+    <p>Valor: <code id="email">${esc(email)}</code></p>
+    <button onclick="navigator.clipboard.writeText(document.getElementById('email').innerText)">Copiar email</button>
+  </div>
+
+  <div class="card">
+    <h2>2. Hash da passphrase (argon2id)</h2>
+    <p>Comando: <code>${esc(hashCmd)}</code></p>
+    <p>Valor:</p>
+    <pre id="hash">${esc(hash)}</pre>
+    <button onclick="navigator.clipboard.writeText(document.getElementById('hash').innerText)">Copiar hash</button>
+  </div>
+
+  <div class="card">
+    <h2>3. Redeploy</h2>
+    <p>Depois dos dois <code>wrangler secret put</code>, rode <code>wrangler deploy</code> uma vez pra o Worker ler os secrets. A próxima visita à home vai mostrar o status do cofre em vez deste wizard.</p>
+  </div>
+
+  <p><a href="/">← Voltar</a></p>
+</main></body></html>`,
+    { headers: { 'content-type': 'text/html; charset=utf-8' } }
+  );
+}
+
+function renderCredentialsError(msg: string): Response {
+  return new Response(
+    `<!doctype html><html><head><meta charset="utf-8"><title>Erro</title><style>${BASE_CSS}</style></head>
+<body><main><h1>Erro</h1><p style="color:#ff6b6b">${esc(msg)}</p><p><a href="/">← Voltar</a></p></main></body></html>`,
+    { status: 400, headers: { 'content-type': 'text/html; charset=utf-8' } }
+  );
+}
 
 function renderLogin(error: string | null, qs: string): Response {
   return new Response(
