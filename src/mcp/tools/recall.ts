@@ -18,6 +18,8 @@ Returns only {id, title, domain, kind, tldr} — NEVER the body. To read the bod
 
 Query in any language — the embedding model is multilingual and matches across languages. A Portuguese query can surface English notes and vice versa.
 
+QUERY STYLE: prefer the literal vocabulary of the note's domain over metaphorical paraphrases. Embeddings activate on semantic proximity to domain terms, not on figurative reinterpretation — "compound interest software" will find a note that an abstract metaphor like "compounding running to stand still" misses. If a first query returns empty, reformulate with domain-literal terms before concluding the note doesn't exist.
+
 IMPORTANT: read ALL returned domains before answering. The valuable match often comes from the unexpected domain — that is exactly what the vault is for. If domains_filter is provided, all entries must be canonical English slugs (same rules as save_note.domains).
 
 INDEXING LATENCY: Cloudflare Vectorize is eventually consistent — a note saved via save_note can take up to ~1-2 minutes to become queryable via recall. If a user asks you to find a concept they JUST saved and the recall returns empty, that is probably indexing delay, NOT a missing note. Do NOT tell the user the vault is broken. Either (a) wait and retry, (b) use get_note on the id returned by save_note if you still have it, or (c) explain the delay and ask the user to try again in a minute. FTS5 search is strongly consistent and returns results immediately, so a recall that matches by keyword often still surfaces fresh notes even when the vector side is still indexing.`;
