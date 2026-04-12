@@ -19,19 +19,149 @@
 
 Mind Vault is **not** a replacement for a daily-capture notes app. It is for the subset of your thinking worth preserving with rigor — the ideas you want to find again, in a different context, years later.
 
-## Quickstart — deploy to your own Cloudflare in ~5 minutes
+## 💰 Cost: $0 — runs entirely on Cloudflare's free tier
+
+Before you deploy anything, read this: **you will not be charged**. Mind Vault runs on Cloudflare's free tier, which is generous enough that a personal vault never comes close to the limits:
+
+| Service | Free tier | What a personal vault uses |
+|---|---|---|
+| Workers (the server) | 100,000 requests/day | ~50 reqs/day in active use |
+| D1 (the database) | 5 GB storage, 5M reads/day, 100k writes/day | A few MB, hundreds of reads |
+| Vectorize (the search) | 5M stored vectors, 30M queries/month | A few thousand at most |
+| Workers AI (embeddings) | 10,000 neurons/day | A few hundred |
+| KV (OAuth tokens) | 100k reads/day, 1k writes/day | Single-digit reads per login |
+
+**No credit card required** to create a Cloudflare account. You can sign up with just an email at [cloudflare.com/sign-up](https://dash.cloudflare.com/sign-up), verify the email, and you're ready. Even if you exceeded the free tier (you won't), Cloudflare shows warnings before charging anything — never a surprise bill.
+
+## Quickstart — deploy your own Mind Vault in ~10 minutes
+
+This is the **recommended path** for most people. It uses the Cloudflare CLI (`wrangler`) from your terminal — foolproof, step-by-step, no GitHub Actions voodoo needed.
+
+**What you need:**
+- A computer with Node.js 20+ installed ([nodejs.org](https://nodejs.org) if you don't have it)
+- A free Cloudflare account ([sign up here](https://dash.cloudflare.com/sign-up) if you don't have one — takes 1 minute)
+- A terminal (Terminal on macOS, PowerShell on Windows, any shell on Linux)
+
+### Step 1 — Get the code
+
+```bash
+git clone https://github.com/orobsonn/mind-vault.git
+cd mind-vault
+npm install
+```
+
+### Step 2 — Log in to Cloudflare
+
+```bash
+npx wrangler login
+```
+
+This opens your web browser and takes you to a Cloudflare page that says "Allow Wrangler to manage your account". Click **Allow**. The browser will say "You have been logged in" and the terminal will say `Successfully logged in`. That's it — no API tokens, no secrets to save anywhere. `wrangler` stores a local auth token on your machine and uses it for every subsequent command.
+
+> 💡 **Having trouble?** If the browser didn't open automatically, copy the URL that `wrangler` printed in the terminal and paste it into your browser manually. If you're on a headless server, add `--browser=false` to the command and follow the printed instructions.
+
+Confirm it worked:
+
+```bash
+npx wrangler whoami
+```
+
+You should see your email and Cloudflare Account ID.
+
+### Step 3 — Create the three Cloudflare resources Mind Vault needs
+
+Run these three commands. Each one creates a resource in your account and prints an ID — **copy those IDs somewhere**, you will need them in Step 4.
+
+```bash
+# 1. The D1 database (SQLite for notes and edges)
+npx wrangler d1 create mind-vault
+
+# 2. The Vectorize index (for semantic search)
+npx wrangler vectorize create mind-vault-embeddings --dimensions=1024 --metric=cosine
+
+# 3. The KV namespace (for OAuth tokens)
+npx wrangler kv namespace create OAUTH_KV
+```
+
+After each one, look at the output for the ID. For example, `wrangler d1 create` prints something like:
+```
+database_id = "a1b2c3d4-..."
+```
+And `wrangler kv namespace create` prints:
+```
+id = "e5f6g7h8..."
+```
+
+### Step 4 — Paste the IDs into `wrangler.toml`
+
+Open `wrangler.toml` in your editor. Find these two lines and replace the existing IDs with the ones you just got in Step 3:
+
+```toml
+[[d1_databases]]
+binding = "DB"
+database_name = "mind-vault"
+database_id = "PASTE_YOUR_D1_ID_HERE"   # ← from "wrangler d1 create"
+migrations_dir = "src/db/migrations"
+
+[[kv_namespaces]]
+binding = "OAUTH_KV"
+id = "PASTE_YOUR_KV_ID_HERE"            # ← from "wrangler kv namespace create"
+```
+
+(The Vectorize binding is referenced by name, not ID, so you don't need to edit it.)
+
+### Step 5 — Deploy for the first time
+
+```bash
+npx wrangler deploy
+```
+
+Wait ~20 seconds. At the end it prints your Worker URL — something like `https://mind-vault.your-subdomain.workers.dev`. Copy it.
+
+### Step 6 — Run the setup wizard
+
+Open the Worker URL in your browser. Because the Worker has no secrets yet, it shows a **5-step setup wizard**:
+
+1. **Credentials** — enter an email + a long passphrase (12+ chars). Click Save.
+   - The next page shows your email and a PBKDF2-SHA256 hash of your passphrase, plus two `wrangler secret put` commands to run.
+2. **Run the secret commands in your terminal:**
+   ```bash
+   npx wrangler secret put OWNER_EMAIL
+   # paste your email when prompted, press Enter
+
+   npx wrangler secret put OWNER_PASSWORD_HASH
+   # paste the hash (the whole pbkdf2$sha256$... string) when prompted, press Enter
+   ```
+3. **Redeploy once** so the Worker picks up the new secrets:
+   ```bash
+   npx wrangler deploy
+   ```
+4. **Refresh the Worker URL in your browser.** It now shows the landing page instead of the wizard. Click **Provision database** once to run the D1 schema migration.
+5. **Install the skill** — download the `using-mind-vault.zip` link from the landing and import it in your Claude client:
+   - **Claude Code:** extract the ZIP to `~/.claude/skills/using-mind-vault/`
+   - **Claude Desktop / Web:** Settings → Skills → Import → select the ZIP
+6. **Connect Claude to the MCP:**
+   - **Claude Code:** `claude mcp add --transport http mind-vault https://your-worker-url.workers.dev/mcp`
+   - **Claude Desktop / Web:** Settings → Connectors → Add custom connector → paste the MCP URL. Claude opens an OAuth window — log in with the email + passphrase you set in step 1.
+7. **(Recommended) Personalize Claude** — copy the block from card 5 of the landing into Claude → Settings → Personalization → Custom instructions. This makes Claude proactively use the latticework method in every conversation, not just when the topic is obvious.
+
+### Step 7 — Start thinking
+
+Open a new Claude conversation and share an idea:
+
+> "I just realized tech debt behaves like compound interest — the longer you ignore it, the worse the rate gets."
+
+Claude will call `MindVault:recall` to sweep the vault for analogies, then offer to save the note with `MindVault:save_note`, atomizing it into one concept per note and creating edges with substantive *why* justifications. You should see the MCP tool calls in the conversation UI.
+
+---
+
+### Alternative: One-click deploy
+
+If you'd rather skip the terminal entirely and don't mind a less guided experience:
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/orobsonn/mind-vault)
 
-1. Click the button above. Cloudflare forks this repo into your GitHub account and provisions a D1 database + Vectorize index + KV namespace from the `wrangler.toml` bindings automatically.
-2. After the deploy completes, open the Worker URL. The first visit runs a **5-step setup wizard**:
-   1. **Credentials** — set an email + passphrase. The Worker hashes the passphrase with PBKDF2-SHA256 (100k iter, Workers-native WebCrypto, no WASM) and shows you the exact `wrangler secret put` commands to run — since the Worker cannot write its own secrets, this step is manual but guided.
-   2. **Provisioning** — one click runs the D1 schema migration (notes, edges, tags, FTS5 + triggers). Idempotent.
-   3. **Connect to Claude** — the wizard shows your MCP URL and copy-pasteable commands for Claude Code, plus a 5-step guide for Claude Desktop / Claude Web via Settings → Connectors → Add custom connector.
-   4. **Install the skill** — download `using-mind-vault.zip` (the method guide that Claude loads to understand the latticework workflow). Works with Claude Code (`~/.claude/skills/`), Claude Desktop, and Claude Web.
-   5. **Personalize Claude** — copy a block into your Claude Custom Instructions to activate the latticework behavior proactively in every conversation.
-3. Redeploy once with `wrangler deploy` after setting the two secrets so the Worker picks them up.
-4. Start talking to Claude. The first time you share an idea, Claude will offer to save it, atomize it, sweep the vault for analogies, and persist with edges — all in a single MCP call.
+This forks the repo into your GitHub account and provisions the bindings automatically. It works, but you'll still need to set the two secrets manually after the first deploy — the one-click flow gets you to the setup wizard, and from there it's the same as Step 6 above.
 
 ## Architecture
 
@@ -85,20 +215,22 @@ This is not a clean-room design. Each decision has roots in a tradition:
 
 The public framing is **latticework thinking / many-model knowledge graph**, not "Munger mental models" — the academic basis (Page, Hofstadter, Gentner, Luhmann) is more rigorous than Munger's speeches alone.
 
-## Continuous deployment
+## Advanced: auto-deploy on git push (optional)
 
-This repo ships with a **GitHub Actions workflow** ([.github/workflows/deploy.yml](.github/workflows/deploy.yml)) that runs typecheck + tests + skill build on every push, and auto-deploys to your Worker on push to `master` or `main`.
+> **Skip this section if you're not sure you need it.** The Quickstart above (with `wrangler login` + `wrangler deploy`) is enough for personal use — you only redeploy when you change code, and you can just run `wrangler deploy` again from your terminal.
 
-To enable auto-deploy on your fork:
+This repo ships with a **GitHub Actions workflow** ([.github/workflows/deploy.yml](.github/workflows/deploy.yml)) that auto-deploys to your Worker on every push to `master` or `main`. Useful if you plan to modify Mind Vault and want your changes to ship automatically when you push to GitHub.
 
-1. In Cloudflare dashboard → My Profile → API Tokens → Create Token → "Edit Cloudflare Workers" template, and add these additional permissions: `D1 Edit`, `Vectorize Edit`, `Workers KV Storage Edit`, `Workers AI Edit`. Save the token.
-2. In your Cloudflare dashboard → right sidebar → copy your Account ID.
-3. In your GitHub fork → Settings → Secrets and variables → Actions → New repository secret:
+To enable it on your fork:
+
+1. Create a Cloudflare API token: go to [dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens) → **Create Token** → use the "Edit Cloudflare Workers" template, then add these extra permissions: `D1 Edit`, `Vectorize Edit`, `Workers KV Storage Edit`, `Workers AI Edit`. Click Continue → Create Token → **copy the token shown** (you won't see it again).
+2. Copy your Cloudflare Account ID: in any page of the Cloudflare dashboard, it's in the right sidebar.
+3. In your GitHub fork, go to **Settings → Secrets and variables → Actions → New repository secret** and add:
    - `CLOUDFLARE_API_TOKEN` = the token from step 1
-   - `CLOUDFLARE_ACCOUNT_ID` = the account id from step 2
-4. Push any change to `master`. The workflow runs tests, builds the skill ZIP, and deploys the Worker to your account.
+   - `CLOUDFLARE_ACCOUNT_ID` = the account ID from step 2
+4. Push any commit to `master`. The workflow runs `npm run typecheck` + `npm test` + `npm run build:skill` before deploying, so a failing test blocks the deploy.
 
-The workflow runs the full test suite (vitest + `@cloudflare/vitest-pool-workers`) before deploying, so a failing test blocks the deploy.
+You can follow the runs at `https://github.com/YOUR_USER/mind-vault/actions`.
 
 ## Development
 
