@@ -10,7 +10,7 @@ export interface Env {
   MCP_OBJECT: DurableObjectNamespace;
 }
 
-export interface AuthContext {
+export interface AuthContext extends Record<string, unknown> {
   email: string;
   loggedInAt: number;
 }
