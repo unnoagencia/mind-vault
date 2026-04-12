@@ -11,6 +11,7 @@ export default defineWorkersConfig({
           d1Databases: ['DB'],
           kvNamespaces: ['OAUTH_KV'],
         },
+        isolatedStorage: false,
       },
     },
   },
