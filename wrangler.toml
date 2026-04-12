@@ -28,3 +28,7 @@ new_sqlite_classes = ["MindVaultMCP"]
 [assets]
 directory = "./assets"
 binding = "ASSETS"
+
+[[kv_namespaces]]
+binding = "OAUTH_KV"
+id = "PLACEHOLDER_SET_ON_DEPLOY"

@@ -1,7 +1,15 @@
-import type { Env } from './env.js';
+import OAuthProvider from '@cloudflare/workers-oauth-provider';
+import { MindVaultMCP } from './mcp/agent.js';
+import { authHandler } from './auth/handler.js';
 
-export default {
-  async fetch(_req: Request, _env: Env): Promise<Response> {
-    return new Response('Mind Vault booting', { status: 200 });
-  },
-};
+export { MindVaultMCP };
+
+export default new OAuthProvider({
+  apiRoute: '/mcp',
+  apiHandler: MindVaultMCP.serve('/mcp') as any,
+  defaultHandler: authHandler as any,
+  authorizeEndpoint: '/authorize',
+  tokenEndpoint: '/token',
+  clientRegistrationEndpoint: '/register',
+  accessTokenTTL: 86400,
+});
