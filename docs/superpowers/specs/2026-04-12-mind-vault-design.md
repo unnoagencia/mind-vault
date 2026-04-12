@@ -75,9 +75,74 @@ binding = "AI"
    - Verifica que o índice Vectorize existe (cria via API se não)
    - Salva secrets via API do Workers (ou pede para o usuário rodar um comando — a ser verificado na implementação)
 4. Wizard mostra a URL `/mcp` e um guia de 3 abas (**Claude Code / Desktop / Web**) com instruções de como plugar.
-5. Final do wizard: card **"Feito por Robson — @orobsonn no Instagram"** com call-to-follow.
-6. Também no final: botão **"Install skill"** (copia `skills/using-mind-vault/` para `~/.claude/skills/` via comando) + link para instalação manual.
+5. Final do wizard: card **"Feito por Robson"** com CTA para redes sociais (ver seção 4.2).
+6. Também no final: seção **"Install the skill"** com download do ZIP e guia visual passo-a-passo por cliente (ver seção 4.3).
 7. Usuário cola a URL no Claude → OAuth flow → login com email+passphrase → MCP conectado.
+8. Wizard sugere também (ver seção 4.4) adicionar um bloco de preferências pessoais na configuração do Claude do usuário — para que o Claude ative o comportamento latticework proativamente em toda conversa, mesmo fora de tópicos óbvios.
+
+### 4.1. Setup wizard — fluxo visual
+
+O wizard é uma única página HTML servida pelo próprio Worker. Sequência:
+1. **Welcome** — explica o que é o Mind Vault em 2 parágrafos, botão "Start setup".
+2. **Credentials** — email + passphrase + confirmar. Grava hash via argon2id.
+3. **Provisioning** — roda migrations no D1, verifica índice Vectorize (progress bar real).
+4. **Connect to Claude** — URL do MCP + 3 abas (Code/Desktop/Web) com instruções copy-pastáveis.
+5. **Install the skill** — ver 4.3.
+6. **Personalize Claude** — ver 4.4.
+7. **Follow the maker** — ver 4.2.
+
+Depois de finalizado, a página `/` vira uma landing read-only que mostra status do cofre (conectado, N notas, N edges, último write) e links para as mesmas instruções.
+
+### 4.2. Card "Feito por Robson"
+
+Localização: última tela do wizard + footer da landing read-only.
+
+Texto e links:
+- **"Feito por Robson Lins. Se esse projeto te ajudou, me segue nas redes:"**
+- Instagram — https://www.instagram.com/orobsonn
+- X / Twitter — https://x.com/orobsonnn
+- YouTube — https://youtube.com/@orobsonnn
+
+Estilo: discreto mas visível, sem dark patterns (sem obrigatoriedade, sem popup, sem bloqueio de fluxo).
+
+### 4.3. Instalação da skill
+
+A skill é distribuída como **ZIP baixável**, não via comando CLI. Razões:
+- Claude Desktop e Web suportam instalação de skills via upload, não só Code.
+- Uniforme entre os 3 clientes — um fluxo só na documentação.
+- Usuário não precisa ter `git` ou conhecer filesystem do Claude.
+
+Implementação:
+- Build step do repo gera `skills/using-mind-vault.zip` (todo o diretório da skill empacotado).
+- Worker serve o ZIP em `/skill/using-mind-vault.zip` diretamente de `[assets]` do wrangler (static assets).
+- Wizard tem botão grande **"Download skill (.zip)"** + 3 abas com instruções passo-a-passo por cliente:
+  - **Claude Code** — comando para descompactar em `~/.claude/skills/`
+  - **Claude Desktop** — caminho da pasta de skills + "arraste o ZIP extraído"
+  - **Claude Web** — upload direto na UI de skills
+
+Cada aba acompanha **screenshots anotados** que o usuário (Robson) vai fornecer durante a implementação. Placeholder nos screenshots até lá.
+
+### 4.4. Bloco de personalização do Claude (user preferences)
+
+Em *Claude → Settings → Personal preferences*, sugerir que o usuário adicione este bloco (copy-pastável no wizard):
+
+```
+Mind Vault is connected as an MCP server. When I am discussing
+concepts, ideas, insights, decisions, or learnings — across any
+domain — proactively think in terms of the latticework method:
+- Check the vault via MindVault:recall before relying only on your
+  own knowledge, especially for cross-domain analogies.
+- When I share something worth remembering, offer to save it and,
+  if I agree, atomize it into one concept per note, tag it with
+  specific domain(s), sweep other domains for analogies, and
+  create edges with substantive why justifications.
+- When I ask about a topic that might be in the vault, prefer
+  recall + expand over generic answers. The value of the vault
+  comes from being read, not just written.
+Follow the using-mind-vault skill for the full method.
+```
+
+O wizard tem um botão "Copy" ao lado do bloco e um link direto para `claude.ai/settings/profile` (Web) e instruções equivalentes para Desktop/Code. Este passo é **opcional mas fortemente recomendado** — sem ele, a skill só ativa quando o Claude percebe que o método é relevante; com ele, o comportamento vira default cross-domain em toda conversa.
 
 **Callout de segurança obrigatório no README:** este é um cofre **single-user por design**. Não compartilhe a URL. Se quiser multi-user, fork e adapte — não é trivial.
 
@@ -216,11 +281,212 @@ Cria uma aresta entre duas notas existentes (para quando o Claude descobre conex
 - ❌ `list_all` — sem paginação genérica. Força rigor via `recall`, protege contexto de dump.
 - ❌ `search_by_tag` — tags são escape hatch. Se virar necessário, entra em v1.1.
 
-## 7. Skill: `using-mind-vault`
+## 7. MCP implementation best practices
+
+Esta seção consolida práticas confirmadas na documentação oficial do Model Context Protocol (modelcontextprotocol.io) e validadas no servidor MCP de referência do projeto Oráculo (`~/Desktop/dev/oraculo-wt-1/mcp/`). São regras de implementação, não sugestões — o servidor do Mind Vault deve seguir todas.
+
+### 7.1. Stack obrigatória
+
+Três pacotes canônicos, todos oficiais, todos coexistindo limpo:
+
+- **`@modelcontextprotocol/sdk`** — SDK oficial do MCP. Usar `McpServer` de `@modelcontextprotocol/sdk/server/mcp.js` como a classe base do servidor, não reimplementar o protocolo.
+- **`agents/mcp`** — Cloudflare, fornece `McpAgent` (runtime stateful no Worker) e `createMcpHandler` / `McpAgent.serve(path)` para plugar no roteamento. Esta é a camada que faz o MCP sobreviver ao lifecycle do Worker.
+- **`@cloudflare/workers-oauth-provider`** — wrapper OAuth 2.1 com dynamic client registration, que permite que Claude Desktop/Web conectem fornecendo apenas a URL.
+
+Padrão de composição (validado no Oráculo):
+
+```ts
+import OAuthProvider from '@cloudflare/workers-oauth-provider';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpAgent } from 'agents/mcp';
+
+export class MindVaultMCP extends McpAgent<Env, Record<string, never>, AuthContext> {
+  server = new McpServer(
+    { name: 'mind-vault', version: '1.0.0' },
+    { instructions: SERVER_INSTRUCTIONS }
+  );
+
+  async init() {
+    const auth = this.props;
+    if (!auth) throw new Error('MindVaultMCP: missing auth props');
+    registerAllTools(this.server, this.env, auth);
+  }
+}
+
+export default new OAuthProvider({
+  apiRoute: '/mcp',
+  apiHandler: MindVaultMCP.serve('/mcp'),
+  defaultHandler: authHandler,
+  authorizeEndpoint: '/authorize',
+  tokenEndpoint: '/token',
+  clientRegistrationEndpoint: '/register',
+  accessTokenTTL: 86400,        // 1 day
+  refreshTokenTTL: 2592000,     // 30 days
+});
+```
+
+### 7.2. SERVER_INSTRUCTIONS
+
+O `McpServer` recebe um campo `instructions` que é injetado na conversa do Claude **toda vez que a conexão MCP é estabelecida**. É complementar à skill: a skill vive no cliente e é descoberta por conteúdo; as instructions viajam com o servidor e são garantidas.
+
+Conteúdo obrigatório das instructions do Mind Vault:
+- **Quem é o servidor** em uma linha.
+- **Quando usar (gatilho):** "Use when the user discusses concepts, ideas, insights, or references prior thinking."
+- **Fluxo recomendado:** "Before answering questions about a topic, call `recall`. Before saving a new note, call `recall` to sweep cross-domain analogies and include edges in the same `save_note` call."
+- **Referência à skill:** "For the full latticework method, load the `using-mind-vault` skill."
+
+As instructions devem caber em ≤ 30 linhas. Não duplicar a skill — apenas apontar para ela.
+
+### 7.3. Tool description — padrão rigoroso
+
+Toda tool do Mind Vault segue o mesmo formato de description, inspirado no Oráculo. A description é **o único lugar** onde o Claude aprende a chamar a tool corretamente, então vale a pena ser explícito:
+
+```ts
+server.registerTool(
+  'save_note',
+  {
+    description: `Grava uma nota atômica no cofre, opcionalmente com edges a notas existentes.
+
+FLUXO OBRIGATÓRIO antes de chamar:
+1. Atomize: uma nota = um conceito. Se o title contém "and/e", quebre em duas chamadas separadas.
+2. Chame recall() primeiro para varredura cross-domain. Mesmo que você ache que a ideia é inédita.
+3. Para cada analogia encontrada em OUTRO domínio, inclua uma edge no array edges desta mesma chamada.
+
+O campo tldr é um teste de Feynman: se você não consegue resumir em uma frase concreta, a nota não está pronta.
+
+O campo domains deve ser ESPECÍFICO (evolutionary-biology, não science; behavioral-economics, não economics).
+
+IMPORTANTE: o campo why de cada edge é rejeitado se tiver menos de 20 caracteres. Uma frase que explique o MECANISMO compartilhado, não apenas "relacionado".`,
+    inputSchema: {
+      title: z.string().min(1).max(200).describe('Title atômico. Sem "and/e".'),
+      body: z.string().min(1).describe('Corpo em markdown'),
+      tldr: z.string().min(10).max(280).describe('Uma frase. Teste de Feynman.'),
+      domains: z.array(z.string()).min(1).max(3).describe('Domínios específicos'),
+      kind: z.string().optional().describe('Tipo livre: idea, fact, question, decision'),
+      tags: z.array(z.string()).optional(),
+      edges: z.array(z.object({
+        to_id: z.string(),
+        relation_type: z.enum([
+          'analogous_to','same_mechanism_as','instance_of','generalizes',
+          'causes','depends_on','contradicts','evidence_for','refines'
+        ]),
+        why: z.string().min(20).describe('Mínimo 20 chars. Explique o mecanismo compartilhado.'),
+      })).optional(),
+    },
+    annotations: {
+      title: 'Save atomic note',
+      readOnlyHint: false,
+      destructiveHint: false,
+      openWorldHint: false,
+    },
+  },
+  safeToolHandler(async (input) => { /* ... */ })
+);
+```
+
+**Regras:**
+1. **Description começa com uma frase única** que resume o que a tool faz.
+2. **"FLUXO OBRIGATÓRIO antes de chamar"** explicita pré-condições. O Claude respeita mais do que "recomendação".
+3. **"IMPORTANTE:"** para regras que vão ser enforçadas server-side (assim o Claude não perde tempo tentando contornar).
+4. **Todo campo zod tem `.describe()`** — é o que o cliente MCP mostra para o Claude.
+5. **Annotations sempre presentes:** `title` (human-readable), `readOnlyHint`, `destructiveHint`, `openWorldHint`. Ajudam o cliente a decidir se pede confirmação.
+
+### 7.4. Response shapes
+
+Dois helpers fixos, idênticos aos do Oráculo:
+
+```ts
+export function toolError(message: string): { content: { type: 'text'; text: string }[]; isError: true } {
+  return { content: [{ type: 'text', text: message }], isError: true };
+}
+
+export function toolSuccess(data: unknown): { content: { type: 'text'; text: string }[] } {
+  return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+}
+```
+
+- **Success** retorna JSON stringificado (Claude parseia confortavelmente). Para respostas com UX relevante (ex: `save_note` que devolve id + resumo do que foi gravado), pode retornar texto formatado em markdown em vez de JSON — mas seja consistente por tool.
+- **Error** retorna `isError: true` — o cliente MCP distingue do sucesso e pode sinalizar na UI.
+
+### 7.5. Error handling — mensagens como instruções
+
+Mensagens de erro no Mind Vault devem seguir a filosofia do Oráculo: **o erro ensina o Claude o que fazer a seguir**. Três regras:
+
+1. **Diga o que aconteceu** em termos concretos (não "erro interno genérico").
+2. **Diga o que o Claude deve fazer** — qual tool chamar, qual input verificar.
+3. **Diga o que o Claude NÃO deve fazer** — explicitamente "não retente com o mesmo input" quando aplicável.
+
+Exemplos para o Mind Vault:
+
+```ts
+// note_id inválido em expand/link
+return toolError(
+  `Note '${note_id}' não encontrada no cofre. Chame recall() primeiro com um termo relacionado ` +
+  `para descobrir o id correto. Não retente com este id.`
+);
+
+// why muito curto em link/save_note.edges
+return toolError(
+  `A justificativa (why) da edge tem apenas ${why.length} caracteres — mínimo 20. ` +
+  `Reescreva explicitando o MECANISMO compartilhado entre as notas, não apenas que elas se relacionam. ` +
+  `Exemplos de why válido: "Ambos são sistemas com feedback negativo retardado, por isso oscilam" ` +
+  `ou "Inverso exato: onde A maximiza X, B minimiza X por construção".`
+);
+
+// edge criando ciclo impossível (from == to)
+return toolError(
+  `Não é possível criar uma edge de uma nota para ela mesma. ` +
+  `Se o objetivo é marcar tensão interna, crie uma nova nota refinando o conceito ` +
+  `e ligue as duas com 'refines' ou 'contradicts'.`
+);
+```
+
+### 7.6. `safeToolHandler` — wrapper obrigatório
+
+Todos os handlers são envolvidos em `safeToolHandler`, que captura exceções não previstas (especialmente D1 errors que vazariam SQL para o cliente) e retorna uma mensagem sanitizada:
+
+```ts
+export function safeToolHandler<T extends (...args: any[]) => Promise<any>>(fn: T): T {
+  return (async (...args: any[]) => {
+    try {
+      return await fn(...args);
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      if (msg.includes('D1_ERROR') || msg.includes('SQLITE_ERROR')) {
+        console.error('MindVault D1 error:', msg);
+        return toolError(
+          `Erro interno no banco (D1) do cofre. Provavelmente temporário — aguarde alguns segundos e tente novamente. ` +
+          `Se persistir, reporte o horário ${new Date().toISOString()} e a ação tentada ao mantenedor.`
+        );
+      }
+      throw err;
+    }
+  }) as T;
+}
+```
+
+### 7.7. Input validation com Zod
+
+Todos os inputs usam zod com `.describe()` explícito em cada campo. O SDK do MCP gera o JSON Schema automaticamente a partir do zod, então enums, min/max, required, tudo vem de graça.
+
+**Regra prática:** se um campo precisa de explicação além do nome, use `.describe()`. Se não precisa, o nome está ruim — renomeie.
+
+### 7.8. MCP-level anti-patterns a evitar
+
+Derivados das docs e do código do Oráculo:
+
+- ❌ **Tools com nomes genéricos** (`search`, `get`, `save`). Sempre prefixe o domínio: `save_note`, `recall`, `expand`.
+- ❌ **Múltiplas tools para a mesma operação com flags diferentes.** Um `save_note` com `edges?` opcional é melhor que `save_note` + `save_note_with_edges`.
+- ❌ **Retornar stacktraces ou erros de SQL crus** para o cliente. Sempre passar por `safeToolHandler`.
+- ❌ **Expor Resources quando uma Tool basta.** O Mind Vault não vai usar Resources no MVP — tudo é Tool, porque o modelo de leitura é "Claude pede quando quer", não "aplicação injeta contexto".
+- ❌ **Tool descriptions vagas.** Se a description é uma linha curta, o Claude vai improvisar — e errar.
+- ❌ **Depender de state entre chamadas.** Cada tool call é atômica. Se precisa de contexto entre chamadas, devolva no output da tool anterior (ex: recall devolve ids que o Claude passa para expand).
+
+## 8. Skill: `using-mind-vault`
 
 Distribuída junto com o repo em `skills/using-mind-vault/`. Setup wizard oferece auto-install.
 
-### 7.1. Estrutura
+### 8.1. Estrutura
 
 ```
 skills/using-mind-vault/
@@ -230,7 +496,7 @@ skills/using-mind-vault/
     └── examples.md             # 3-4 sessões before/after anotadas
 ```
 
-### 7.2. Frontmatter
+### 8.2. Frontmatter
 
 ```yaml
 ---
@@ -239,7 +505,7 @@ description: Captures atomic concepts and their structural connections into a pe
 ---
 ```
 
-### 7.3. Seções do SKILL.md
+### 8.3. Seções do SKILL.md
 
 1. **Purpose** — uma linha sobre o método (não explicar o que é grafo).
 2. **When to save / When NOT to save** — critérios de filtro. NOT save: chat efêmero, tarefas do dia, fatos triviais já no treinamento do Claude.
@@ -262,15 +528,15 @@ description: Captures atomic concepts and their structural connections into a pe
 7. **Tool reference** — nomes totalmente qualificados: `MindVault:save_note`, `MindVault:recall`, etc.
 8. **Pointers:** `reference/edge-types.md` para dúvida sobre qual aresta, `reference/examples.md` para padrão de sessões completas.
 
-### 7.4. `reference/edge-types.md`
+### 8.4. `reference/edge-types.md`
 
 Uma seção por aresta, tabela de contents no topo. Cada seção: definição, 2 exemplos curtos, par confuso mais comum e como distinguir. Ex: `analogous_to` vs `same_mechanism_as` — "analogous_to = same shape, same_mechanism_as = same underlying mechanism. Use the stronger one when you can justify the why."
 
-### 7.5. `reference/examples.md`
+### 8.5. `reference/examples.md`
 
 3-4 sessões anotadas mostrando o fluxo completo: user message → Claude decide salvar → chama `recall` → lê tldrs → identifica analogia cross-domain → chama `save_note` com edges → explicação do why de cada edge.
 
-## 8. Repo layout
+## 9. Repo layout
 
 ```
 mind-vault/
@@ -294,6 +560,11 @@ mind-vault/
 │       └── reference/
 │           ├── edge-types.md
 │           └── examples.md
+├── assets/                   # servido como static via wrangler [assets]
+│   ├── skill-screenshots/    # PNGs dos guias de install por cliente (fornecidos pelo Robson)
+│   └── using-mind-vault.zip  # gerado pelo build step antes do deploy
+├── scripts/
+│   └── build-skill-zip.ts    # zipa skills/using-mind-vault/ para assets/
 ├── docs/
 │   └── superpowers/specs/    # este arquivo
 ├── wrangler.toml
@@ -302,7 +573,7 @@ mind-vault/
 └── README.md                 # hero + Deploy to CF button + intellectual lineage + security callout
 ```
 
-## 9. Premissas verificadas (docs CF, abril 2026)
+## 10. Premissas verificadas (docs CF, abril 2026)
 
 Durante o brainstorm essas premissas foram confirmadas via docs oficiais Cloudflare:
 
@@ -315,7 +586,7 @@ Durante o brainstorm essas premissas foram confirmadas via docs oficiais Cloudfl
 - Limites atuais de free tier de Vectorize e Workers AI (suficientes para uso pessoal, mas confirmar números no README).
 - Se `wrangler secret put` via UI pós-deploy funciona para `OWNER_PASSWORD_HASH` ou se o setup wizard precisa de outra estratégia de persistência (ex: gravar na própria tabela D1 numa linha singleton).
 
-## 10. Fora do escopo (MVP) e roadmap
+## 11. Fora do escopo (MVP) e roadmap
 
 **Fora do MVP:**
 - UI web do grafo (só MCP). Fast-follow: página `/graph` read-only no próprio Worker, lendo D1 direto.
@@ -325,7 +596,7 @@ Durante o brainstorm essas premissas foram confirmadas via docs oficiais Cloudfl
 - Re-ranking neural dos resultados de `recall`. Por enquanto merge simples.
 - Skill em PT-BR. Por enquanto só inglês para maximizar alcance.
 
-## 11. Decisões arquiteturais (resumo das discussões)
+## 12. Decisões arquiteturais (resumo das discussões)
 
 | Decisão | Alternativas descartadas | Razão |
 |---|---|---|
@@ -338,6 +609,9 @@ Durante o brainstorm essas premissas foram confirmadas via docs oficiais Cloudfl
 | `tldr` obrigatório | Só title + body | Teste de Feynman: se não dá para resumir, não entendeu |
 | Append-only no MVP | CRUD completo | Simplifica Vectorize, protege de acidentes, força refinamento via `refines` |
 | Skill como componente de 1ª classe | README + tool descriptions só | Tool descs são curtas demais para ensinar método completo |
+| Skill distribuída como ZIP | Comando CLI copiando arquivos | Cobre Code/Desktop/Web uniformemente; usuário não precisa conhecer filesystem do Claude |
+| SERVER_INSTRUCTIONS no MCP + skill | Só skill | Instructions garantem método sem depender de discovery; skill aprofunda quando ativada |
+| Bloco de personalização do Claude sugerido | Só MCP + skill | Ativa o comportamento latticework proativamente em toda conversa, não só quando tema é óbvio |
 | Framing "latticework" | "Munger mental models" | Base acadêmica mais sólida (Page, Hofstadter, Gentner, Luhmann) |
 
 ---
