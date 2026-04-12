@@ -2,6 +2,9 @@ import { defineWorkersConfig } from '@cloudflare/vitest-pool-workers/config';
 
 export default defineWorkersConfig({
   test: {
+    poolMatchGlobs: [
+      ['**/test/auth.test.ts', 'forks'],
+    ],
     poolOptions: {
       workers: {
         singleWorker: true,
