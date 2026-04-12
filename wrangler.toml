@@ -6,7 +6,7 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "mind-vault"
-database_id = "PLACEHOLDER_SET_ON_DEPLOY"
+database_id = "0707d49a-d76e-40dd-8b0c-24186f8e9d3e"
 migrations_dir = "src/db/migrations"
 
 [[vectorize]]
@@ -31,4 +31,4 @@ binding = "ASSETS"
 
 [[kv_namespaces]]
 binding = "OAUTH_KV"
-id = "PLACEHOLDER_SET_ON_DEPLOY"
+id = "f9b7d9089728449c8479c2c3c01b6eca"
