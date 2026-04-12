@@ -3,6 +3,12 @@ main = "src/index.ts"
 compatibility_date = "2025-02-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Custom domain — Cloudflare auto-provisions DNS + SSL.
+# The domain's zone must be on the same Cloudflare account.
+[[routes]]
+pattern = "mind.robsonlins.com"
+custom_domain = true
+
 [[d1_databases]]
 binding = "DB"
 database_name = "mind-vault"
