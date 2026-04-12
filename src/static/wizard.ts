@@ -162,6 +162,9 @@ export interface LandingStats {
   notes: number;
   edges: number;
   lastWrite: number | null;
+  clients: number;
+  tokens: number;
+  connected: boolean;
 }
 
 export function renderLanding(stats: LandingStats): string {
@@ -169,29 +172,125 @@ export function renderLanding(stats: LandingStats): string {
     ? new Date(stats.lastWrite).toLocaleString('pt-BR')
     : 'Nunca';
 
+  const badge = stats.connected
+    ? `<span style="display:inline-block;padding:3px 10px;border-radius:999px;background:#14351f;color:#6fe39a;font-size:12px;font-weight:600;border:1px solid #1f5a33">● Claude conectado</span>`
+    : `<span style="display:inline-block;padding:3px 10px;border-radius:999px;background:#2a2017;color:#ffb870;font-size:12px;font-weight:600;border:1px solid #5a3a1f">○ Aguardando conexão Claude</span>`;
+
   return `<!doctype html>
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Mind Vault</title>
-  <style>${BASE_CSS}</style>
+  <style>${BASE_CSS}
+    .url-box { word-break: break-all; font-family: ui-monospace, Menlo, monospace; background:#0b0d10; border:1px solid #1e242b; border-radius:8px; padding:12px; font-size:13px; color:#e6e8eb; }
+    .row { display:flex; gap:8px; align-items:flex-start; flex-wrap:wrap; }
+    .row > :first-child { flex:1; min-width:260px; }
+  </style>
 </head>
 <body>
 <main>
-  <h1>Mind Vault</h1>
-  <p>Servidor MCP ativo em <code id="mcp-url">/mcp</code></p>
+  <h1>Mind Vault ${badge}</h1>
+  <p style="color:#a7adb5">Cofre pessoal de conhecimento latticework operado via Claude MCP.</p>
 
   <div class="card">
     <h2>Status do Vault</h2>
-    <p><strong>Notas:</strong> ${stats.notes}</p>
-    <p><strong>Edges:</strong> ${stats.edges}</p>
-    <p><strong>Último write:</strong> ${lastWriteStr}</p>
+    <p><strong>Notas:</strong> ${stats.notes} &nbsp;·&nbsp; <strong>Edges:</strong> ${stats.edges} &nbsp;·&nbsp; <strong>Último write:</strong> ${lastWriteStr}</p>
+    <p style="color:#a7adb5;font-size:13px"><strong>Clientes OAuth registrados:</strong> ${stats.clients} &nbsp;·&nbsp; <strong>Tokens ativos:</strong> ${stats.tokens}</p>
+    <p style="color:#6b7278;font-size:12px">Auto-atualiza a cada 15s · <a href="#" onclick="location.reload();return false">recarregar agora</a></p>
+  </div>
+
+  <div class="card">
+    <h2>1. URL do servidor MCP</h2>
+    <p style="color:#a7adb5">Cole essa URL em Claude Desktop / Web → Settings → Connectors → Add custom connector.</p>
+    <div class="row">
+      <div id="mcp-url" class="url-box">/mcp</div>
+      <button type="button" data-copy="mcp-url">Copiar URL</button>
+    </div>
+    <details style="margin-top:12px">
+      <summary style="cursor:pointer;color:#a7adb5">Usando Claude Code (CLI)?</summary>
+      <div class="row" style="margin-top:8px">
+        <div id="code-add" class="url-box">claude mcp add --transport http mind-vault &lt;URL&gt;</div>
+        <button type="button" data-copy="code-add">Copiar comando</button>
+      </div>
+    </details>
+  </div>
+
+  <div class="card">
+    <h2>2. Skill: <code>using-mind-vault</code></h2>
+    <p style="color:#a7adb5">Baixe o ZIP e instale no cliente Claude da sua escolha. A skill ensina o método latticework — atomizar conceito, varredura cross-domain, disciplina de edges com <em>why</em> concreto.</p>
+    <p><a href="/skill/using-mind-vault.zip" download><button type="button">⬇ Download using-mind-vault.zip</button></a></p>
+    <p style="color:#6b7278;font-size:12px"><strong>Claude Code:</strong> extraia para <code>~/.claude/skills/</code> · <strong>Desktop / Web:</strong> Settings → Skills → Import</p>
+  </div>
+
+  <div class="card">
+    <h2>3. Prompt de personalização</h2>
+    <p style="color:#a7adb5">Cole em <em>Claude → Settings → Personalization → Custom instructions</em> para ativar o comportamento latticework proativamente em qualquer conversa, não só quando o tópico é óbvio.</p>
+    <pre id="prefs-block">${PREFS_BLOCK}</pre>
+    <button type="button" data-copy="prefs-block">Copiar prompt</button>
   </div>
 
   ${FOOTER_HTML}
 </main>
-${MCP_URL_SCRIPT}
+
+<script>
+  // Replace placeholders with real URL
+  (function () {
+    const url = location.origin + '/mcp';
+    const urlEl = document.getElementById('mcp-url');
+    if (urlEl) urlEl.textContent = url;
+    const codeEl = document.getElementById('code-add');
+    if (codeEl) codeEl.textContent = 'claude mcp add --transport http mind-vault ' + url;
+  })();
+
+  // Copy buttons with fallback + visual feedback
+  async function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      try { await navigator.clipboard.writeText(text); return true; } catch (_) {}
+    }
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (_) {}
+    document.body.removeChild(ta);
+    return ok;
+  }
+  document.querySelectorAll('button[data-copy]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-copy');
+      const el = document.getElementById(id);
+      if (!el) return;
+      const text = (el.textContent || '').trim();
+      const ok = await copyText(text);
+      const original = btn.textContent;
+      btn.textContent = ok ? 'Copiado ✓' : 'Selecione + Ctrl+C';
+      btn.style.background = ok ? '#4caf50' : '#ff9800';
+      setTimeout(() => {
+        btn.textContent = original;
+        btn.style.background = '';
+      }, 1800);
+    });
+  });
+
+  // Auto-refresh status every 15s (soft: fetches /status and updates counters without full reload)
+  async function refreshStatus() {
+    try {
+      const r = await fetch('/status', { cache: 'no-store' });
+      if (!r.ok) return;
+      const j = await r.json();
+      if (!j.configured) return;
+      // Trigger full reload if transition connected/disconnected
+      const wasConnected = ${stats.connected ? 'true' : 'false'};
+      if (j.connected !== wasConnected) {
+        location.reload();
+      }
+    } catch (_) {}
+  }
+  setInterval(refreshStatus, 15000);
+<\/script>
 </body>
 </html>`;
 }

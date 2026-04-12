@@ -1,5 +1,5 @@
 import type { Env } from '../env.js';
-import { handleRoot, handleProvision, isSetup } from './setup.js';
+import { handleRoot, handleProvision, handleStatus, isSetup } from './setup.js';
 import { hashPassword, verifyPassword } from './password.js';
 import { BASE_CSS } from '../static/styles.js';
 import { esc } from '../util/html.js';
@@ -9,6 +9,7 @@ export const authHandler = {
     const url = new URL(req.url);
 
     if (url.pathname === '/') return handleRoot(req, env);
+    if (url.pathname === '/status') return handleStatus(env);
     if (url.pathname === '/setup/provision' && req.method === 'POST') return handleProvision(env);
     if (url.pathname === '/setup/credentials' && req.method === 'POST') return handleCredentials(req);
 
