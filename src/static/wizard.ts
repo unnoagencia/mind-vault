@@ -16,7 +16,7 @@ Follow the using-mind-vault skill for the full method.`;
 
 const FOOTER_HTML = `
 <div class="card footer">
-  Feito por Robson Lins &nbsp;·&nbsp;
+  Made by Robson Lins &nbsp;·&nbsp;
   <a href="https://www.instagram.com/orobsonn" target="_blank">Instagram</a> &nbsp;·&nbsp;
   <a href="https://x.com/orobsonnn" target="_blank">X / Twitter</a> &nbsp;·&nbsp;
   <a href="https://youtube.com/@orobsonnn" target="_blank">YouTube</a>
@@ -34,7 +34,7 @@ const MCP_URL_SCRIPT = `<script>
 
 export function renderWizard(): string {
   return `<!doctype html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -44,25 +44,25 @@ export function renderWizard(): string {
 <body>
 <main>
   <h1>Mind Vault</h1>
-  <p>Configure seu grafo pessoal de conhecimento em 5 passos.</p>
+  <p>Set up your personal knowledge graph in 5 steps.</p>
 
   <div class="card">
-    <h2>1. Credenciais</h2>
-    <p>Defina o email e a passphrase que você usará para autorizar o Claude a acessar o vault.</p>
+    <h2>1. Credentials</h2>
+    <p>Set the email and passphrase you will use to authorize Claude to access the vault.</p>
     <form method="post" action="/setup/credentials">
-      <p><label>Email<br><input type="email" name="email" required placeholder="voce@exemplo.com"></label></p>
-      <p><label>Passphrase<br><input type="password" name="password" required placeholder="frase longa e memorável"></label></p>
-      <p><label>Confirmar passphrase<br><input type="password" name="password_confirm" required placeholder="repita a passphrase"></label></p>
-      <button type="submit">Salvar credenciais</button>
+      <p><label>Email<br><input type="email" name="email" required placeholder="you@example.com"></label></p>
+      <p><label>Passphrase<br><input type="password" name="password" required placeholder="long memorable phrase"></label></p>
+      <p><label>Confirm passphrase<br><input type="password" name="password_confirm" required placeholder="repeat the passphrase"></label></p>
+      <button type="submit">Save credentials</button>
     </form>
   </div>
 
   <div class="card">
     <h2>2. Provisioning</h2>
-    <p>Aplica o schema do Mind Vault no seu banco D1 (tabelas <code>notes</code>, <code>edges</code>, <code>tags</code>, FTS5 e triggers). Idempotente — pode clicar mais de uma vez sem problema.</p>
-    <p style="color:#a7adb5;font-size:13px">O índice Vectorize <code>mind-vault-embeddings</code> e o namespace KV <code>OAUTH_KV</code> são provisionados separadamente, antes do primeiro <code>wrangler deploy</code>, via CLI: <code>wrangler vectorize create mind-vault-embeddings --dimensions=768 --metric=cosine</code> e <code>wrangler kv namespace create OAUTH_KV</code>. Se você deployou pelo botão "Deploy to Cloudflare" do README, o Cloudflare já criou tudo a partir dos bindings do <code>wrangler.toml</code>.</p>
-    <button id="btn-provision" onclick="provision(this)">Provisionar banco</button>
-    <p id="provision-status" style="display:none;color:#4caf50">Schema aplicado com sucesso!</p>
+    <p>Applies the Mind Vault schema to your D1 database (tables <code>notes</code>, <code>edges</code>, <code>tags</code>, FTS5 and triggers). Idempotent — safe to click multiple times.</p>
+    <p style="color:#a7adb5;font-size:13px">The Vectorize index <code>mind-vault-embeddings</code> and the KV namespace <code>OAUTH_KV</code> are provisioned separately, before the first <code>wrangler deploy</code>, via CLI: <code>wrangler vectorize create mind-vault-embeddings --dimensions=1024 --metric=cosine</code> and <code>wrangler kv namespace create OAUTH_KV</code>. If you deployed via the "Deploy to Cloudflare" button in the README, Cloudflare already created everything from the <code>wrangler.toml</code> bindings.</p>
+    <button id="btn-provision" onclick="provision(this)">Provision database</button>
+    <p id="provision-status" style="display:none;color:#4caf50">Schema applied successfully!</p>
     <script>
       async function provision(btn) {
         btn.disabled = true;
@@ -70,41 +70,41 @@ export function renderWizard(): string {
         const j = await r.json();
         if (j.ok) {
           document.getElementById('provision-status').style.display = '';
-          btn.textContent = 'Provisionado ✓';
+          btn.textContent = 'Provisioned ✓';
         } else {
           btn.disabled = false;
-          alert('Erro ao provisionar: ' + JSON.stringify(j));
+          alert('Provisioning error: ' + JSON.stringify(j));
         }
       }
     <\/script>
   </div>
 
   <div class="card">
-    <h2>3. Conectar ao Claude</h2>
-    <p>URL do servidor MCP:</p>
+    <h2>3. Connect to Claude</h2>
+    <p>MCP server URL:</p>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <code id="mcp-url" style="flex:1;min-width:280px">/mcp</code>
-      <button type="button" onclick="copyMcpUrl(this)">Copiar URL</button>
+      <button type="button" onclick="copyMcpUrl(this)">Copy URL</button>
     </div>
     <div class="tabs" style="margin-top:16px">
       <div class="tab active" onclick="showTab(this,'code')">Claude Code</div>
       <div class="tab" onclick="showTab(this,'ui')">Claude Desktop / Web</div>
     </div>
     <div id="tab-code">
-      <p>Execute no terminal (o comando já vem com a URL deste Worker):</p>
+      <p>Run in the terminal (the command already includes this Worker URL):</p>
       <pre id="code-add">claude mcp add --transport http mind-vault &lt;URL&gt;</pre>
-      <button type="button" onclick="copyCodeCmd(this)">Copiar comando</button>
+      <button type="button" onclick="copyCodeCmd(this)">Copy command</button>
     </div>
     <div id="tab-ui" style="display:none">
-      <p>Claude Desktop e Claude Web usam o mesmo fluxo — ambos plugam um MCP remoto pela UI de Connectors:</p>
+      <p>Claude Desktop and Claude Web use the same flow — both plug in a remote MCP via the Connectors UI:</p>
       <ol>
-        <li>Abra <strong>Claude Desktop</strong> ou <a href="https://claude.ai" target="_blank">claude.ai</a>.</li>
-        <li>Vá em <strong>Settings → Connectors</strong> (em versões antigas: <em>Integrations</em>).</li>
-        <li>Clique em <strong>Add custom connector</strong> (ou <em>Add MCP server</em>).</li>
-        <li>Cole a URL acima no campo <em>URL</em> e dê um nome (ex: <code>mind-vault</code>).</li>
-        <li>O Claude vai abrir uma janela de OAuth — faça login com o email + passphrase que você definiu no passo 1.</li>
+        <li>Open <strong>Claude Desktop</strong> or <a href="https://claude.ai" target="_blank">claude.ai</a>.</li>
+        <li>Go to <strong>Settings → Connectors</strong> (older versions: <em>Integrations</em>).</li>
+        <li>Click <strong>Add custom connector</strong> (or <em>Add MCP server</em>).</li>
+        <li>Paste the URL above into the <em>URL</em> field and give it a name (e.g. <code>mind-vault</code>).</li>
+        <li>Claude will open an OAuth window — log in with the email + passphrase you set in step 1.</li>
       </ol>
-      <p style="color:#a7adb5;font-size:13px">Observação: o Claude detecta automaticamente que este é um servidor MCP com OAuth 2.1 + dynamic client registration, então o único dado que você precisa colar é a URL.</p>
+      <p style="color:#a7adb5;font-size:13px">Note: Claude automatically detects that this is an MCP server with OAuth 2.1 + dynamic client registration, so the only piece of data you need to paste is the URL.</p>
     </div>
     <script>
       function showTab(el, id) {
@@ -125,25 +125,25 @@ export function renderWizard(): string {
       }
       function flash(btn) {
         const original = btn.textContent;
-        btn.textContent = 'Copiado ✓';
+        btn.textContent = 'Copied ✓';
         setTimeout(() => { btn.textContent = original; }, 1500);
       }
     <\/script>
   </div>
 
   <div class="card">
-    <h2>4. Instalar a Skill</h2>
-    <p>Baixe o arquivo ZIP da skill e instale no Claude:</p>
+    <h2>4. Install the Skill</h2>
+    <p>Download the skill ZIP and install it in Claude:</p>
     <p><a href="/skill/using-mind-vault.zip" download>⬇ using-mind-vault.zip</a></p>
-    <p><strong>Claude Code:</strong> <code>claude mcp install-skill using-mind-vault.zip</code></p>
-    <p><strong>Claude Desktop / Web:</strong> Vá em Settings → Skills → Import e selecione o arquivo ZIP.</p>
+    <p><strong>Claude Code:</strong> extract to <code>~/.claude/skills/</code></p>
+    <p><strong>Claude Desktop / Web:</strong> Settings → Skills → Import and select the ZIP file.</p>
   </div>
 
   <div class="card">
-    <h2>5. Personalizar o Claude</h2>
-    <p>Cole o bloco abaixo em Settings → Personalization → Custom instructions:</p>
+    <h2>5. Personalize Claude</h2>
+    <p>Paste the block below into Settings → Personalization → Custom instructions:</p>
     <pre id="prefs">${PREFS_BLOCK}</pre>
-    <button onclick="copyPrefs()">Copiar</button>
+    <button onclick="copyPrefs()">Copy</button>
     <script>
       function copyPrefs() {
         navigator.clipboard.writeText(document.getElementById('prefs').textContent.trim());
@@ -169,15 +169,15 @@ export interface LandingStats {
 
 export function renderLanding(stats: LandingStats): string {
   const lastWriteStr = stats.lastWrite
-    ? new Date(stats.lastWrite).toLocaleString('pt-BR')
-    : 'Nunca';
+    ? new Date(stats.lastWrite).toLocaleString('en-US')
+    : 'Never';
 
   const badge = stats.connected
-    ? `<span style="display:inline-block;padding:3px 10px;border-radius:999px;background:#14351f;color:#6fe39a;font-size:12px;font-weight:600;border:1px solid #1f5a33">● Claude conectado</span>`
-    : `<span style="display:inline-block;padding:3px 10px;border-radius:999px;background:#2a2017;color:#ffb870;font-size:12px;font-weight:600;border:1px solid #5a3a1f">○ Aguardando conexão Claude</span>`;
+    ? `<span style="display:inline-block;padding:3px 10px;border-radius:999px;background:#14351f;color:#6fe39a;font-size:12px;font-weight:600;border:1px solid #1f5a33">● Claude connected</span>`
+    : `<span style="display:inline-block;padding:3px 10px;border-radius:999px;background:#2a2017;color:#ffb870;font-size:12px;font-weight:600;border:1px solid #5a3a1f">○ Waiting for Claude connection</span>`;
 
   return `<!doctype html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -191,50 +191,49 @@ export function renderLanding(stats: LandingStats): string {
 <body>
 <main>
   <h1>Mind Vault ${badge}</h1>
-  <p style="color:#a7adb5">Cofre pessoal de conhecimento latticework operado via Claude MCP.</p>
+  <p style="color:#a7adb5">Personal latticework knowledge graph operated via Claude MCP.</p>
 
   <div class="card">
-    <h2>Status do Vault</h2>
-    <p><strong>Notas:</strong> ${stats.notes} &nbsp;·&nbsp; <strong>Edges:</strong> ${stats.edges} &nbsp;·&nbsp; <strong>Último write:</strong> ${lastWriteStr}</p>
-    <p style="color:#a7adb5;font-size:13px"><strong>Clientes OAuth registrados:</strong> ${stats.clients} &nbsp;·&nbsp; <strong>Tokens ativos:</strong> ${stats.tokens}</p>
-    <p style="color:#6b7278;font-size:12px">Auto-atualiza a cada 15s · <a href="#" onclick="location.reload();return false">recarregar agora</a></p>
+    <h2>Vault Status</h2>
+    <p><strong>Notes:</strong> ${stats.notes} &nbsp;·&nbsp; <strong>Edges:</strong> ${stats.edges} &nbsp;·&nbsp; <strong>Last write:</strong> ${lastWriteStr}</p>
+    <p style="color:#a7adb5;font-size:13px"><strong>Registered OAuth clients:</strong> ${stats.clients} &nbsp;·&nbsp; <strong>Active tokens:</strong> ${stats.tokens}</p>
+    <p style="color:#6b7278;font-size:12px">Auto-refreshes every 15s · <a href="#" onclick="location.reload();return false">reload now</a></p>
   </div>
 
   <div class="card">
-    <h2>1. URL do servidor MCP</h2>
-    <p style="color:#a7adb5">Cole essa URL em Claude Desktop / Web → Settings → Connectors → Add custom connector.</p>
+    <h2>1. MCP server URL</h2>
+    <p style="color:#a7adb5">Paste this URL into Claude Desktop / Web → Settings → Connectors → Add custom connector.</p>
     <div class="row">
       <div id="mcp-url" class="url-box">/mcp</div>
-      <button type="button" data-copy="mcp-url">Copiar URL</button>
+      <button type="button" data-copy="mcp-url">Copy URL</button>
     </div>
     <details style="margin-top:12px">
-      <summary style="cursor:pointer;color:#a7adb5">Usando Claude Code (CLI)?</summary>
+      <summary style="cursor:pointer;color:#a7adb5">Using Claude Code (CLI)?</summary>
       <div class="row" style="margin-top:8px">
         <div id="code-add" class="url-box">claude mcp add --transport http mind-vault &lt;URL&gt;</div>
-        <button type="button" data-copy="code-add">Copiar comando</button>
+        <button type="button" data-copy="code-add">Copy command</button>
       </div>
     </details>
   </div>
 
   <div class="card">
     <h2>2. Skill: <code>using-mind-vault</code></h2>
-    <p style="color:#a7adb5">Baixe o ZIP e instale no cliente Claude da sua escolha. A skill ensina o método latticework — atomizar conceito, varredura cross-domain, disciplina de edges com <em>why</em> concreto.</p>
+    <p style="color:#a7adb5">Download the ZIP and install it in your Claude client. The skill teaches the latticework method — atomize the concept, cross-domain sweep, edge discipline with a concrete <em>why</em>.</p>
     <p><a href="/skill/using-mind-vault.zip" download><button type="button">⬇ Download using-mind-vault.zip</button></a></p>
-    <p style="color:#6b7278;font-size:12px"><strong>Claude Code:</strong> extraia para <code>~/.claude/skills/</code> · <strong>Desktop / Web:</strong> Settings → Skills → Import</p>
+    <p style="color:#6b7278;font-size:12px"><strong>Claude Code:</strong> extract to <code>~/.claude/skills/</code> · <strong>Desktop / Web:</strong> Settings → Skills → Import</p>
   </div>
 
   <div class="card">
-    <h2>3. Prompt de personalização</h2>
-    <p style="color:#a7adb5">Cole em <em>Claude → Settings → Personalization → Custom instructions</em> para ativar o comportamento latticework proativamente em qualquer conversa, não só quando o tópico é óbvio.</p>
+    <h2>3. Personalization prompt</h2>
+    <p style="color:#a7adb5">Paste into <em>Claude → Settings → Personalization → Custom instructions</em> to activate the latticework behavior proactively in every conversation, not just when the topic is obvious.</p>
     <pre id="prefs-block">${PREFS_BLOCK}</pre>
-    <button type="button" data-copy="prefs-block">Copiar prompt</button>
+    <button type="button" data-copy="prefs-block">Copy prompt</button>
   </div>
 
   ${FOOTER_HTML}
 </main>
 
 <script>
-  // Replace placeholders with real URL
   (function () {
     const url = location.origin + '/mcp';
     const urlEl = document.getElementById('mcp-url');
@@ -243,7 +242,6 @@ export function renderLanding(stats: LandingStats): string {
     if (codeEl) codeEl.textContent = 'claude mcp add --transport http mind-vault ' + url;
   })();
 
-  // Copy buttons with fallback + visual feedback
   async function copyText(text) {
     if (navigator.clipboard && window.isSecureContext) {
       try { await navigator.clipboard.writeText(text); return true; } catch (_) {}
@@ -266,7 +264,7 @@ export function renderLanding(stats: LandingStats): string {
       const text = (el.textContent || '').trim();
       const ok = await copyText(text);
       const original = btn.textContent;
-      btn.textContent = ok ? 'Copiado ✓' : 'Selecione + Ctrl+C';
+      btn.textContent = ok ? 'Copied ✓' : 'Select + Ctrl+C';
       btn.style.background = ok ? '#4caf50' : '#ff9800';
       setTimeout(() => {
         btn.textContent = original;
@@ -275,14 +273,12 @@ export function renderLanding(stats: LandingStats): string {
     });
   });
 
-  // Auto-refresh status every 15s (soft: fetches /status and updates counters without full reload)
   async function refreshStatus() {
     try {
       const r = await fetch('/status', { cache: 'no-store' });
       if (!r.ok) return;
       const j = await r.json();
       if (!j.configured) return;
-      // Trigger full reload if transition connected/disconnected
       const wasConnected = ${stats.connected ? 'true' : 'false'};
       if (j.connected !== wasConnected) {
         location.reload();

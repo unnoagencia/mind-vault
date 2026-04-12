@@ -24,9 +24,9 @@ export const authHandler = {
         const form = await req.formData();
         const email = String(form.get('email') ?? '');
         const password = String(form.get('password') ?? '');
-        if (email !== env.OWNER_EMAIL) return renderLogin('Credenciais inválidas.', url.search);
+        if (email !== env.OWNER_EMAIL) return renderLogin('Invalid credentials.', url.search);
         const ok = await verifyPassword(password, env.OWNER_PASSWORD_HASH!);
-        if (!ok) return renderLogin('Credenciais inválidas.', url.search);
+        if (!ok) return renderLogin('Invalid credentials.', url.search);
         // parseAuthRequest expects the original GET request; reconstruct it from the query string
         const authReq = await provider.parseAuthRequest(new Request(url.toString(), { method: 'GET' }));
         const result = await provider.completeAuthorization({
@@ -51,49 +51,48 @@ async function handleCredentials(req: Request): Promise<Response> {
   const password = String(form.get('password') ?? '');
   const password2 = String(form.get('password_confirm') ?? form.get('password2') ?? '');
 
-  if (!email || !password) return renderCredentialsError('Email e passphrase são obrigatórios.');
-  if (password.length < 12) return renderCredentialsError('Passphrase precisa de pelo menos 12 caracteres.');
-  if (password !== password2) return renderCredentialsError('Confirmação não confere com a passphrase.');
+  if (!email || !password) return renderCredentialsError('Email and passphrase are required.');
+  if (password.length < 12) return renderCredentialsError('Passphrase must be at least 12 characters.');
+  if (password !== password2) return renderCredentialsError('Confirmation does not match the passphrase.');
 
   const hash = await hashPassword(password);
   const emailCmd = `wrangler secret put OWNER_EMAIL`;
   const hashCmd = `wrangler secret put OWNER_PASSWORD_HASH`;
 
   return new Response(
-    `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mind Vault — Credenciais</title><style>${BASE_CSS}</style></head>
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mind Vault — Credentials</title><style>${BASE_CSS}</style></head>
 <body><main>
-  <h1>Credenciais geradas</h1>
-  <p>Cole os valores abaixo nos secrets do Worker. Como o próprio Worker não consegue escrever secrets em si mesmo, esse passo é manual — rode os comandos no terminal, um de cada vez, e cole o valor quando o wrangler pedir.</p>
+  <h1>Credentials generated</h1>
+  <p>Paste the values below into the Worker secrets. Since the Worker cannot write secrets to itself, this step is manual — run the commands in your terminal one at a time and paste the value when wrangler prompts for it.</p>
 
   <div class="card">
     <h2>1. Email</h2>
-    <p>Comando: <code>${esc(emailCmd)}</code></p>
-    <p>Valor:</p>
+    <p>Command: <code>${esc(emailCmd)}</code></p>
+    <p>Value:</p>
     <pre id="email-value">${esc(email)}</pre>
-    <button type="button" data-copy="email-value">Copiar email</button>
+    <button type="button" data-copy="email-value">Copy email</button>
   </div>
 
   <div class="card">
-    <h2>2. Hash da passphrase (PBKDF2-SHA256, 100k iter)</h2>
-    <p>Comando: <code>${esc(hashCmd)}</code></p>
-    <p>Valor:</p>
+    <h2>2. Passphrase hash (PBKDF2-SHA256, 100k iter)</h2>
+    <p>Command: <code>${esc(hashCmd)}</code></p>
+    <p>Value:</p>
     <pre id="hash-value">${esc(hash)}</pre>
-    <button type="button" data-copy="hash-value">Copiar hash</button>
+    <button type="button" data-copy="hash-value">Copy hash</button>
   </div>
 
   <div class="card">
     <h2>3. Redeploy</h2>
-    <p>Depois dos dois <code>wrangler secret put</code>, rode <code>wrangler deploy</code> uma vez para o Worker enxergar os novos secrets. A próxima visita à home vai mostrar o status do cofre em vez deste wizard, e <code>/authorize</code> vai renderizar a tela de login em vez de "Vault not configured".</p>
+    <p>After running both <code>wrangler secret put</code> commands, run <code>wrangler deploy</code> once so the Worker picks up the new secrets. The next visit to the home page will show the vault status instead of this wizard, and <code>/authorize</code> will render the login screen instead of "Vault not configured".</p>
   </div>
 
-  <p><a href="/">← Voltar ao wizard</a></p>
+  <p><a href="/">← Back to wizard</a></p>
 
   <script>
     async function copyText(text) {
       if (navigator.clipboard && window.isSecureContext) {
         try { await navigator.clipboard.writeText(text); return true; } catch (_) {}
       }
-      // Fallback: textarea + execCommand (works even fora de secure context)
       const ta = document.createElement('textarea');
       ta.value = text;
       ta.style.position = 'fixed';
@@ -114,7 +113,7 @@ async function handleCredentials(req: Request): Promise<Response> {
         const text = (el.textContent || '').trim();
         const ok = await copyText(text);
         const original = btn.textContent;
-        btn.textContent = ok ? 'Copiado ✓' : 'Selecione o texto e Ctrl+C';
+        btn.textContent = ok ? 'Copied ✓' : 'Select the text and Ctrl+C';
         btn.style.background = ok ? '#4caf50' : '#ff9800';
         setTimeout(() => {
           btn.textContent = original;
@@ -130,21 +129,21 @@ async function handleCredentials(req: Request): Promise<Response> {
 
 function renderCredentialsError(msg: string): Response {
   return new Response(
-    `<!doctype html><html><head><meta charset="utf-8"><title>Erro</title><style>${BASE_CSS}</style></head>
-<body><main><h1>Erro</h1><p style="color:#ff6b6b">${esc(msg)}</p><p><a href="/">← Voltar</a></p></main></body></html>`,
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Error</title><style>${BASE_CSS}</style></head>
+<body><main><h1>Error</h1><p style="color:#ff6b6b">${esc(msg)}</p><p><a href="/">← Back</a></p></main></body></html>`,
     { status: 400, headers: { 'content-type': 'text/html; charset=utf-8' } }
   );
 }
 
 function renderLogin(error: string | null, qs: string): Response {
   return new Response(
-    `<!doctype html><html><head><meta charset="utf-8"><title>Login</title><style>${BASE_CSS}</style></head>
-<body><main><h1>Mind Vault</h1><p>Login para autorizar acesso MCP.</p>
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Login</title><style>${BASE_CSS}</style></head>
+<body><main><h1>Mind Vault</h1><p>Log in to authorize MCP access.</p>
 ${error ? `<p style="color:#ff6b6b">${esc(error)}</p>` : ''}
 <form method="post" action="/authorize${esc(qs)}">
 <p><label>Email<br><input type="email" name="email" required></label></p>
 <p><label>Passphrase<br><input type="password" name="password" required></label></p>
-<button type="submit">Autorizar</button></form></main></body></html>`,
+<button type="submit">Authorize</button></form></main></body></html>`,
     { headers: { 'content-type': 'text/html; charset=utf-8' } }
   );
 }
