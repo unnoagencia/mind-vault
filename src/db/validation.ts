@@ -1,22 +1,17 @@
 // Canonical domain slug format: lowercase ASCII kebab-case, 2-40 chars.
-// Domains are vault schema, not content — they must not drift between
-// conversation languages. Enforced server-side so Claude cannot fragment
-// the taxonomy accidentally.
+// This is a SYNTACTIC check. Semantic language enforcement (e.g. rejecting
+// 'biologia-evolutiva' because it's a Portuguese translation) lives in the
+// tool description of save_note + the using-mind-vault skill — Claude is
+// instructed to always use English canonical slugs, and the tool description
+// makes that load-bearing. The validator here just stops obvious syntax
+// violations (accents, uppercase, spaces, etc) from getting into the
+// taxonomy.
 export const DOMAIN_SLUG_REGEX = /^[a-z][a-z0-9-]{1,39}$/;
-
-// Known non-English domain translations to reject with pedagogical guidance
-const NON_ENGLISH_TRANSLATIONS: Record<string, string> = {
-  'biologia-evolutiva': 'evolutionary-biology',
-};
 
 export function validateDomains(domains: string[]): string | null {
   for (const d of domains) {
     if (typeof d !== 'string' || !DOMAIN_SLUG_REGEX.test(d)) {
       return buildDomainError(d);
-    }
-    // Check for known non-English translations
-    if (d in NON_ENGLISH_TRANSLATIONS) {
-      return buildNonEnglishError(d, NON_ENGLISH_TRANSLATIONS[d]);
     }
   }
   return null;
@@ -32,14 +27,5 @@ function buildDomainError(offender: unknown): string {
     `accented characters, spaces, uppercase, or translations to other languages. ` +
     `If the conversation is in Portuguese and you were going to use 'biologia-evolutiva', ` +
     `use 'evolutionary-biology' instead.`
-  );
-}
-
-function buildNonEnglishError(nonEnglish: string, canonical: string): string {
-  return (
-    `Domain '${nonEnglish}' is a non-English translation. Use the canonical English form ` +
-    `'${canonical}' instead. Domains are vault schema — they need to be stable identifiers ` +
-    `that do not drift between conversation languages. If the conversation is in Portuguese ` +
-    `and you were going to use '${nonEnglish}', use '${canonical}' instead.`
   );
 }

@@ -45,11 +45,11 @@ describe('validateDomains', () => {
     expect(validateDomains([longSlug])).not.toBeNull();
   });
 
-  it('rejects Portuguese translation with pedagogical error', () => {
-    const err = validateDomains(['biologia-evolutiva']);
-    expect(err).not.toBeNull();
-    expect(err).toContain('evolutionary-biology');
-    expect(err).toContain('biologia-evolutiva');
+  it('accepts syntactically-valid non-English slugs (language is not enforced by regex)', () => {
+    // 'biologia-evolutiva' is ASCII kebab-case lowercase 18 chars — syntactically valid.
+    // Semantic language enforcement (reject Portuguese translations) lives in the tool
+    // description of save_note + the skill. This test documents the limit of the validator.
+    expect(validateDomains(['biologia-evolutiva'])).toBeNull();
   });
 
   it('stops at first invalid in list', () => {
