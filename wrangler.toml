@@ -1,0 +1,30 @@
+name = "mind-vault"
+main = "src/index.ts"
+compatibility_date = "2025-02-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mind-vault"
+database_id = "PLACEHOLDER_SET_ON_DEPLOY"
+migrations_dir = "src/db/migrations"
+
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "mind-vault-embeddings"
+
+[ai]
+binding = "AI"
+
+[durable_objects]
+bindings = [
+  { name = "MCP_OBJECT", class_name = "MindVaultMCP" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["MindVaultMCP"]
+
+[assets]
+directory = "./assets"
+binding = "ASSETS"
