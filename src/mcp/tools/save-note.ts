@@ -3,6 +3,7 @@ import type { Env } from '../../env.js';
 import { newId } from '../../util/id.js';
 import { safeToolHandler, toolError, toolSuccess } from '../helpers.js';
 import { EDGE_TYPES, insertEdge, insertNote, insertTags, getNoteById } from '../../db/queries.js';
+import { validateDomains } from '../../db/validation.js';
 import { embed, upsertNoteVector } from '../../vector/index.js';
 
 const edgeSchema = z.object({
@@ -12,26 +13,29 @@ const edgeSchema = z.object({
 });
 
 const inputSchema = {
-  title: z.string().min(1).max(200).describe('Title atômico. Sem "and/e".'),
-  body: z.string().min(1).describe('Corpo em markdown'),
-  tldr: z.string().min(10).max(280).describe('Uma frase. Teste de Feynman.'),
-  domains: z.array(z.string().min(1)).min(1).max(3).describe('Domínios específicos (1-3)'),
+  title: z.string().min(1).max(200).describe('Atomic title. No "and".'),
+  body: z.string().min(1).describe('Body in markdown'),
+  tldr: z.string().min(10).max(280).describe('One sentence. Feynman test.'),
+  domains: z.array(z.string().min(1)).min(1).max(3).describe('Canonical English slugs (1-3)'),
   kind: z.string().optional(),
   tags: z.array(z.string()).optional(),
   edges: z.array(edgeSchema).optional(),
 };
 
-const DESCRIPTION = `Grava uma nota atômica no cofre, opcionalmente com edges a notas existentes.
+const DESCRIPTION = `Saves an atomic note to the vault, optionally with edges to existing notes.
 
-FLUXO OBRIGATÓRIO antes de chamar:
-1. Atomize: uma nota = um conceito. Se o title contém "and/e", quebre em duas chamadas separadas.
-2. Chame recall() primeiro para varredura cross-domain. Mesmo que você ache que a ideia é inédita.
-3. Para cada analogia em OUTRO domínio, inclua uma edge no array edges desta mesma chamada.
+MANDATORY FLOW before calling:
+1. Atomize: one note = one concept. If the title contains "and", split it into separate calls.
+2. Call recall() first to sweep for cross-domain analogies. Even if you think the idea is original.
+3. For each analogy in ANOTHER domain, include an edge in the edges array of this same call.
 
-O campo tldr é um teste de Feynman: se você não consegue resumir em uma frase concreta, a nota NÃO está pronta — não force, converse mais com o usuário até ter clareza. NÃO chame save_note sem um tldr concreto.
-O campo domains deve ser ESPECÍFICO (evolutionary-biology, não science).
+The tldr field is a Feynman test: if you cannot summarize the concept in one concrete sentence, the note is NOT ready — do not force it, keep talking with the user until you have clarity. Do NOT call save_note without a concrete tldr.
 
-IMPORTANTE: o campo why de cada edge é rejeitado se tiver menos de 20 caracteres, e edges apontando para ids inexistentes são rejeitadas. Se você não tem o id da nota alvo, chame recall() primeiro.`;
+Write title/body/tldr in the CONVERSATION LANGUAGE (if the user is speaking Portuguese, save in Portuguese; English → English). The embedding model is multilingual.
+
+The domains field MUST always use canonical English kebab-case slugs (e.g. 'evolutionary-biology', 'behavioral-economics', 'systems-thinking'), regardless of conversation language. Domains are schema — do NOT translate them.
+
+IMPORTANT: the why field of each edge is rejected if it has fewer than 20 characters, and edges pointing to non-existent ids are rejected. If you do not have the target note id, call recall() first. Domains that do not match the canonical slug format are rejected with an explanation.`;
 
 interface SaveNoteInput {
   title: string;
@@ -57,6 +61,11 @@ export function registerSaveNote(server: any, env: Env): void {
       },
     },
     safeToolHandler(async (input: SaveNoteInput) => {
+      const domainError = validateDomains(input.domains);
+      if (domainError) {
+        return toolError(domainError);
+      }
+
       const now = Date.now();
       const id = newId();
 
@@ -64,15 +73,17 @@ export function registerSaveNote(server: any, env: Env): void {
         for (const e of input.edges) {
           if (e.why.length < 20) {
             return toolError(
-              `A justificativa (why) da edge tem apenas ${e.why.length} caracteres — mínimo de 20 caracteres. ` +
-              `Reescreva explicitando o MECANISMO compartilhado entre as notas, não apenas que elas se relacionam.`
+              `The why field of this edge has only ${e.why.length} characters — minimum is 20 characters. ` +
+              `Rewrite it naming the shared MECHANISM between the two notes, not just saying they are related. ` +
+              `Good example: "Both are systems with delayed negative feedback, so both oscillate." ` +
+              `Bad example: "both are about growth".`
             );
           }
           const target = await getNoteById(env, e.to_id);
           if (!target) {
             return toolError(
-              `Note '${e.to_id}' não encontrada no cofre. Chame recall() primeiro com um termo relacionado ` +
-              `para descobrir o id correto. Não retente com este id.`
+              `Note '${e.to_id}' not found in the vault. Call recall() first with a related query ` +
+              `to discover the correct id. Do NOT retry with this id.`
             );
           }
         }

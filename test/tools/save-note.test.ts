@@ -6,7 +6,7 @@ import { registerSaveNote } from '../../src/mcp/tools/save-note.js';
 const E = env as any;
 
 function fakeAI() {
-  return { run: vi.fn(async () => ({ data: [Array(768).fill(0.1)] })) };
+  return { run: vi.fn(async () => ({ data: [Array(1024).fill(0.1)] })) };
 }
 function fakeVectorize() {
   return { upsert: vi.fn(async () => ({})), query: vi.fn(async () => ({ matches: [] })) };
@@ -52,17 +52,17 @@ describe('save_note', () => {
     const { server, registered } = makeServer();
     registerSaveNote(server, E);
     await E.DB.prepare(
-      `INSERT INTO notes VALUES ('target','t','b','tl','["x"]',null,0,0)`
+      `INSERT INTO notes VALUES ('target','t','b','tl','["seed-domain"]',null,0,0)`
     ).run();
     const r = await registered.save_note({
       title: 'X',
       body: 'b',
       tldr: 'tl of at least ten chars here ok',
-      domains: ['x'],
+      domains: ['seed-domain'],
       edges: [{ to_id: 'target', relation_type: 'analogous_to', why: 'too short' }],
     });
     expect(r.isError).toBe(true);
-    expect(r.content[0].text).toContain('20 caracteres');
+    expect(r.content[0].text).toContain('20 characters');
   });
 
   it('rejects edge pointing to missing note', async () => {
@@ -71,10 +71,46 @@ describe('save_note', () => {
     const r = await registered.save_note({
       title: 'X', body: 'b',
       tldr: 'tldr long enough here really',
-      domains: ['x'],
+      domains: ['seed-domain'],
       edges: [{ to_id: 'ghost', relation_type: 'analogous_to', why: 'this is a long enough why to pass validation' }],
     });
     expect(r.isError).toBe(true);
     expect(r.content[0].text).toContain('ghost');
+  });
+
+  it('rejects uppercase domain', async () => {
+    const { server, registered } = makeServer();
+    registerSaveNote(server, E);
+    const r = await registered.save_note({
+      title: 'X', body: 'b',
+      tldr: 'tldr long enough here really',
+      domains: ['Evolutionary-Biology'],
+    });
+    expect(r.isError).toBe(true);
+    expect(r.content[0].text).toContain('Evolutionary-Biology');
+  });
+
+  it('rejects accented domain', async () => {
+    const { server, registered } = makeServer();
+    registerSaveNote(server, E);
+    const r = await registered.save_note({
+      title: 'X', body: 'b',
+      tldr: 'tldr long enough here really',
+      domains: ['biologia-evolutiva-avançada'],
+    });
+    expect(r.isError).toBe(true);
+    expect(r.content[0].text).toContain('biologia-evolutiva-avançada');
+  });
+
+  it('does not write to D1 when domain validation fails', async () => {
+    const { server, registered } = makeServer();
+    registerSaveNote(server, E);
+    await registered.save_note({
+      title: 'X', body: 'b',
+      tldr: 'tldr long enough here really',
+      domains: ['INVALID'],
+    });
+    const count = await E.DB.prepare('SELECT count(*) c FROM notes').first();
+    expect(count.c).toBe(0);
   });
 });
