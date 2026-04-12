@@ -35,7 +35,9 @@ Write title/body/tldr in the CONVERSATION LANGUAGE (if the user is speaking Port
 
 The domains field MUST always use canonical English kebab-case slugs (e.g. 'evolutionary-biology', 'behavioral-economics', 'systems-thinking'), regardless of conversation language. Domains are schema — do NOT translate them.
 
-IMPORTANT: the why field of each edge is rejected if it has fewer than 20 characters, and edges pointing to non-existent ids are rejected. If you do not have the target note id, call recall() first. Domains that do not match the canonical slug format are rejected with an explanation.`;
+IMPORTANT: the why field of each edge is rejected if it has fewer than 20 characters, and edges pointing to non-existent ids are rejected. If you do not have the target note id, call recall() first. Domains that do not match the canonical slug format are rejected with an explanation.
+
+INDEXING LATENCY: Cloudflare Vectorize is eventually consistent. After save_note returns successfully, the newly-saved note is immediately queryable via its id (get_note, expand) because D1 is strongly consistent, but the VECTOR may take up to ~1-2 minutes to become queryable via recall. If the user asks you to recall a concept right after saving it and recall returns empty or misses the fresh note, that is NOT a bug — explain the delay to the user and suggest trying again in a minute, or use get_note/expand on the id you just received if you need to reference the content immediately.`;
 
 interface SaveNoteInput {
   title: string;
@@ -89,6 +91,10 @@ export function registerSaveNote(server: any, env: Env): void {
         }
       }
 
+      // Embed FIRST — if Workers AI fails we bail before any D1 write, so the
+      // caller sees a clean error and no phantom notes are left in the database.
+      const vec = await embed(env, input.tldr);
+
       await insertNote(env, {
         id,
         title: input.title,
@@ -114,7 +120,8 @@ export function registerSaveNote(server: any, env: Env): void {
         }
       }
 
-      const vec = await embed(env, input.tldr);
+      // Upsert vector LAST. If this fails, the note is in D1 but not queryable
+      // via recall until re-embedded. get_note(id) and expand(id) still work.
       await upsertNoteVector(env, id, vec, {
         domains: input.domains,
         kind: input.kind ?? null,

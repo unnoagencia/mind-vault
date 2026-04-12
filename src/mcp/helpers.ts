@@ -26,8 +26,25 @@ export function safeToolHandler<A extends unknown[]>(
           `If it persists, report the timestamp ${new Date().toISOString()} and the attempted action to the maintainer.`
         );
       }
+      if (msg.includes('VECTORIZE') || msg.includes('Vectorize') || msg.includes('vectorize')) {
+        console.error('MindVault Vectorize error:', msg);
+        return toolError(
+          `Vectorize (the semantic search index) returned an error: ${msg}. ` +
+          `This can be transient (index is eventually consistent and occasionally throttles). ` +
+          `If this happened during save_note, the note itself was written to D1 but the vector may not be queryable — the note is still accessible via get_note(id) and expand(id), just not via recall() until re-embedded. ` +
+          `If this happened during recall, wait ~30s and try again; if it persists, fall back to describing your answer without vault recall and warn the user.`
+        );
+      }
+      if (msg.includes('@cf/baai') || msg.includes('Workers AI') || msg.includes('AiError')) {
+        console.error('MindVault Workers AI error:', msg);
+        return toolError(
+          `Workers AI (the embedding model) returned an error: ${msg}. ` +
+          `This is usually transient. The note was NOT saved because embedding failed before the database write (save_note validates inputs and generates the vector before committing). ` +
+          `Wait a few seconds and retry the exact same save_note call — it is safe, there are no partial writes.`
+        );
+      }
       console.error('MindVault tool error:', msg);
-      return toolError(`Unexpected error: ${msg}. Check the input and try again.`);
+      return toolError(`Unexpected error: ${msg}. Check the input and try again. If the problem persists, this is probably a bug — report the timestamp ${new Date().toISOString()} to the maintainer.`);
     }
   };
 }
