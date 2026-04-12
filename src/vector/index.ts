@@ -1,7 +1,9 @@
 import type { Env } from '../env.js';
 
+// @cf/baai/bge-m3 returns 1024-dim vectors. Multilingual (100+ languages).
+// The Vectorize index must be created with dimensions=1024.
 export async function embed(env: Env, text: string): Promise<number[]> {
-  const res = await env.AI.run('@cf/baai/bge-base-en-v1.5', { text: [text] }) as {
+  const res = await env.AI.run('@cf/baai/bge-m3', { text: [text] }) as {
     data: number[][];
   };
   const v = res.data?.[0];
