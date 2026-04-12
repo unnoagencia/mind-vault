@@ -7,7 +7,7 @@
     "dev": "wrangler dev",
     "deploy": "npm run build:skill && wrangler deploy",
     "build:skill": "tsx scripts/build-skill-zip.ts",
-    "test": "vitest run",
+    "test": "vitest run && vitest run --config vitest.auth.config.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
