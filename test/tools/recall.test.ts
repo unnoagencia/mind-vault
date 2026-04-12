@@ -26,7 +26,7 @@ describe('recall', () => {
     await E.DB.exec('DELETE FROM edges');
     await E.DB.exec('DELETE FROM tags');
     await E.DB.exec('DELETE FROM notes');
-    E.AI = { run: vi.fn(async () => ({ data: [Array(768).fill(0.1)] })) };
+    E.AI = { run: vi.fn(async () => ({ data: [Array(1024).fill(0.1)] })) };
     E.VECTORIZE = {
       upsert: vi.fn(),
       query: vi.fn(async () => ({ matches: [
@@ -51,5 +51,23 @@ describe('recall', () => {
     }
     const domains = new Set(parsed.results.map((x: any) => x.domain));
     expect(domains.size).toBeGreaterThanOrEqual(2);
+  });
+
+  it('rejects invalid domains_filter slug', async () => {
+    const registered: any = {};
+    const server: any = { registerTool: (n: string, _m: any, h: any) => { registered[n] = h; } };
+    registerRecall(server, E);
+    const r = await registered.recall({ query: 'x', domains_filter: ['INVALID'] });
+    expect(r.isError).toBe(true);
+    expect(r.content[0].text).toContain('INVALID');
+    expect(r.content[0].text).toContain('evolutionary-biology');
+  });
+
+  it('accepts valid domains_filter slug', async () => {
+    const registered: any = {};
+    const server: any = { registerTool: (n: string, _m: any, h: any) => { registered[n] = h; } };
+    registerRecall(server, E);
+    const r = await registered.recall({ query: 'coevolution', domains_filter: ['evolutionary-biology'] });
+    expect(r.isError).toBeUndefined();
   });
 });

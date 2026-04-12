@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import type { Env } from '../../env.js';
-import { safeToolHandler, toolSuccess } from '../helpers.js';
+import { safeToolHandler, toolError, toolSuccess } from '../helpers.js';
 import { ftsSearch, type NoteRow } from '../../db/queries.js';
+import { validateDomains } from '../../db/validation.js';
 import { embed, queryVector } from '../../vector/index.js';
 
 const inputSchema = {
@@ -10,12 +11,14 @@ const inputSchema = {
   domains_filter: z.array(z.string()).optional(),
 };
 
-const DESCRIPTION = `Busca híbrida cross-domain no cofre (vetorial + FTS).
+const DESCRIPTION = `Hybrid cross-domain search in the vault (vector + FTS).
 
-Retorna até \`limit\` resultados balanceados por domínio (no máximo 3 por domínio, até 5 domínios distintos).
-Retorna apenas {id, title, domain, kind, tldr} — NUNCA o body. Para ler o body, chame get_note(id).
+Returns up to \`limit\` results balanced by domain (at most 3 per domain, up to 5 distinct domains).
+Returns only {id, title, domain, kind, tldr} — NEVER the body. To read the body, call get_note(id).
 
-IMPORTANTE: leia TODOS os domínios retornados antes de responder. O match valioso frequentemente vem do domínio inesperado — é exatamente isso que o cofre serve para expor.`;
+Query in any language — the embedding model is multilingual and matches across languages. A Portuguese query can surface English notes and vice versa.
+
+IMPORTANT: read ALL returned domains before answering. The valuable match often comes from the unexpected domain — that is exactly what the vault is for. If domains_filter is provided, all entries must be canonical English slugs (same rules as save_note.domains).`;
 
 interface RecallHit {
   id: string; title: string; domain: string; kind: string | null; tldr: string;
@@ -35,6 +38,11 @@ export function registerRecall(server: any, env: Env): void {
       },
     },
     safeToolHandler(async (input: RecallInput) => {
+      if (input.domains_filter && input.domains_filter.length > 0) {
+        const err = validateDomains(input.domains_filter);
+        if (err) return toolError(err);
+      }
+
       const limit = input.limit ?? 15;
       const vec = await embed(env, input.query);
       const [vectorMatches, ftsRows] = await Promise.all([
