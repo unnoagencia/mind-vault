@@ -19,6 +19,32 @@
 
 Mind Vault is **not** a replacement for a daily-capture notes app. It is for the subset of your thinking worth preserving with rigor — the ideas you want to find again, in a different context, years later.
 
+## When Mind Vault makes sense (and when it doesn't)
+
+Mind Vault is an opinionated tool. It is not "notes for Claude" — it is a discipline wrapped in an MCP server. Before installing it, check yourself against these lists.
+
+### ✅ Use Mind Vault if…
+
+- **You read or work across multiple domains** and want the structural analogies between them to surface automatically. The whole point of the vault is to notice that a pattern you just hit in software engineering is the same shape as a pattern you read about in evolutionary biology last year.
+- **You already live inside Claude Code, Claude Desktop, or a Claude-compatible client.** Mind Vault is an MCP server — its value comes from being reachable without leaving the conversation.
+- **You make judgment calls with reasoning worth preserving** — design decisions, research conclusions, strategic bets. The vault protects the *why* so you can revisit it later.
+- **You are on Pro, Max, or the API** and can afford the ~2,400-token overhead per cold request. On Max 5x/20x this is negligible.
+- **You believe in the Munger/Luhmann method**: atomize one concept per note, link with substantive whys, prefer cross-domain structure over folders. If you don't buy the method, the tool will feel like friction.
+
+### ❌ Skip Mind Vault if…
+
+- **You're on Claude Free.** The MCP overhead eats ~27% of your 5-hour window before you type anything. Not worth it.
+- **You want a daily journal or task list.** The vault is ruthless by design — it rejects ephemeral capture. Use Obsidian, Notion, or Apple Notes.
+- **You only work within one narrow domain.** The value proposition is cross-domain recall. A single-domain user gets most of the benefit from a plain markdown folder and `grep`.
+- **You don't use Claude as your primary interface.** The vault is readable from a web dashboard, but the *writing* discipline only works when an LLM is mediating the save flow. Without that, you'll drift back to dumping notes.
+- **You want a second brain that captures everything.** Mind Vault punishes low-signal saves — sloppy notes pollute future recalls. If you can't articulate a one-sentence tldr, the note isn't ready.
+- **You need offline access or local-only storage.** The vault runs on Cloudflare D1 + Vectorize. Your notes leave your machine.
+- **You care about preserving the exact surface wording of what you wrote.** The vault nudges toward atomization and rewriting — it is a thinking tool, not an archival tool.
+
+### The honest one-liner
+
+Mind Vault is worth it when you treat it as **a discipline for the ideas you'll actually want again**, not as a place to dump things. If that distinction doesn't resonate, you probably don't need it yet.
+
 ## 💰 Cost: $0 — runs entirely on Cloudflare's free tier
 
 Before you deploy anything, read this: **you will not be charged**. Mind Vault runs on Cloudflare's free tier, which is generous enough that a personal vault never comes close to the limits:
@@ -32,6 +58,52 @@ Before you deploy anything, read this: **you will not be charged**. Mind Vault r
 | KV (OAuth tokens) | 100k reads/day, 1k writes/day | Single-digit reads per login |
 
 **No credit card required** to create a Cloudflare account. You can sign up with just an email at [cloudflare.com/sign-up](https://dash.cloudflare.com/sign-up), verify the email, and you're ready. Even if you exceeded the free tier (you won't), Cloudflare shows warnings before charging anything — never a surprise bill.
+
+## ⚠️ The real cost: Claude tokens
+
+The infrastructure is free, but connecting the MCP to Claude is **not** free from the token budget's perspective. You need to understand this before deciding if Mind Vault is worth it for your usage pattern.
+
+### What it costs
+
+| Cost | Tokens | When you pay |
+|---|---|---|
+| MCP always-on overhead | **~2,400** | Every request while the MCP is connected (cacheable, 5-min TTL) |
+| `using-mind-vault` skill | ~1,300 | Only when the skill is invoked (don't invoke if MCP is connected — it duplicates the tool descriptions) |
+| `recall` response | 100–300 | Per call (returns tldrs only, never bodies — cheap by design) |
+| `get_note` response | 500–2,000 | Per call (full body) |
+
+The ~2,400 tokens come from the tool descriptions and usage instructions that the MCP injects into the system prompt ([`src/mcp/instructions.ts`](src/mcp/instructions.ts) + the 6 tool schemas). They load on **every** request while the MCP is connected, whether or not you actually use the vault that turn. The prompt cache (5-min TTL) makes this near-free during active back-and-forth, but you re-pay it on every cold start.
+
+### Impact by Claude plan
+
+Anthropic doesn't publish exact token quotas for consumer plans, but here's the practical read based on community-observed numbers:
+
+| Plan | Usage window | Observed budget | MCP overhead as % of window |
+|---|---|---|---|
+| **Free** | 5h rolling | very tight (~9k tok effective) | ~27% — **don't use** Mind Vault on Free |
+| **Pro** ($20/mo) | 5h rolling + weekly cap | ~44k tok per 5h window | ~5.5% per cold request |
+| **Max 5x** ($100/mo) | 5h rolling + weekly cap | ~220k tok per 5h window | ~1.1% |
+| **Max 20x** ($200/mo) | 5h rolling + weekly cap | ~880k tok per 5h window | ~0.3% |
+| **API** (Claude Code / SDK) | no window, pay per token | unlimited | billed directly (~$0.036/cold turn on Opus, ~$0.0036 cached) |
+
+Key things to know about the plan windows:
+
+- **All paid plans use a 5-hour rolling window**, not a daily reset. Messages fall off 5 hours after you sent them. Check `/usage` in Claude Code or `claude.ai/settings/usage` to see live counters.
+- **Weekly caps were added in August 2025** to Pro and Max for heavy users, on top of the 5h window. Mind Vault's fixed overhead contributes to this weekly counter too.
+- **Peak hours burn faster**: on weekdays 5–11am PT / 1–7pm GMT, Anthropic tightens the 5h session limits during high demand. An MCP-connected session with 10 cold turns in peak hours can eat a noticeable chunk of a Pro window.
+- **API billing is the opposite model**: no window, but every token is metered. Here the MCP overhead becomes a real line item. Cache discipline matters most.
+
+### Practical recommendations
+
+1. **Free plan**: don't bother. The MCP overhead eats too much of your tiny window.
+2. **Pro plan**: connect the MCP selectively. For conversations that are going to touch the vault, keep it on. For an hour of UI work or debugging, disconnect it — you'll get noticeably more headroom in the 5h window.
+3. **Max 5x / 20x**: leave it connected. The overhead is <1% of your window and the discipline encoded in the tool descriptions pays for itself the first time it prevents a bad note.
+4. **API / Claude Code**: leave it connected in vault-centric sessions, disconnect in others. You're paying per token either way; cache warmth is your best lever.
+5. **Never invoke the `using-mind-vault` skill while the MCP is connected** — it duplicates ~1,300 tokens of guidance the MCP already loaded. The skill exists for fallback environments (Gemini, Codex, etc.) without MCP support.
+6. **Batch vault interactions** inside a single session. Five recalls in a row stay cached and are nearly free. Five recalls spread across the day pay cold-start each time.
+7. **Prefer `recall` over `get_note`.** Read full bodies only when the tldr is insufficient. A 2k-token note read 5 times in a session is 10k tokens gone.
+
+For the full methodology and per-tool breakdown, see [docs/token-cost.md](docs/token-cost.md).
 
 ## Quickstart — deploy your own Mind Vault in ~10 minutes
 
@@ -165,6 +237,37 @@ This forks the repo into your GitHub account and provisions the bindings automat
 
 ## Architecture
 
+```mermaid
+flowchart LR
+    User([You])
+    Claude[Claude Code<br/>Desktop / Web]
+    Worker[Cloudflare Worker<br/>single endpoint]
+    OAuth[OAuth 2.1<br/>KV grants]
+    MCP[MCP Server<br/>6 tools]
+    D1[(D1<br/>notes + edges<br/>FTS5)]
+    Vec[(Vectorize<br/>1024-dim<br/>cosine)]
+    AI[Workers AI<br/>bge-m3 multilingual]
+    Web[Web Dashboard<br/>graph view]
+
+    User -->|chat| Claude
+    User -->|browse| Web
+    Claude -->|OAuth| Worker
+    Web -->|session| Worker
+    Worker --> OAuth
+    Worker --> MCP
+    MCP -->|SQL + FTS5| D1
+    MCP -->|embed query| AI
+    MCP -->|vector search| Vec
+    AI -.->|on save| Vec
+
+    classDef edge fill:#f4f4f5,stroke:#71717a,color:#18181b
+    classDef store fill:#ecfdf5,stroke:#10b981,color:#064e3b
+    classDef compute fill:#eff6ff,stroke:#3b82f6,color:#1e3a8a
+    class User,Claude,Web edge
+    class D1,Vec,OAuth store
+    class Worker,MCP,AI compute
+```
+
 A single Cloudflare Worker serves three responsibilities on the same URL:
 
 | Path | Function |
@@ -202,6 +305,42 @@ A single Cloudflare Worker serves three responsibilities on the same URL:
 Tool descriptions are written in English with mandatory-flow instructions ("call `recall` first before `save_note`") and pedagogical error messages ("if the conversation is in Portuguese and you were going to use `biologia-evolutiva`, use `evolutionary-biology` instead") that teach Claude how to recover from mistakes in one shot.
 
 ## Method & intellectual lineage
+
+```mermaid
+flowchart TD
+    Idea([You articulate an idea])
+    Atomize{One concept?<br/>title has 'and'/'e'?}
+    Split[Split into<br/>separate notes]
+    Tldr{Can you write<br/>a one-sentence tldr?}
+    NotReady[Keep thinking —<br/>note isn't ready]
+    Recall[recall across domains<br/>even if 'obviously new']
+    Read[Read ALL returned<br/>domains, not just top hit]
+    Hit{Cross-domain<br/>analogy found?}
+    Edge[Draft edge with<br/>substantive why<br/>20+ chars, name the mechanism]
+    Save[save_note<br/>atomic + edges in one call]
+    Vault[(Vault grows<br/>as a latticework)]
+
+    Idea --> Atomize
+    Atomize -->|yes, split| Split --> Tldr
+    Atomize -->|no, atomic| Tldr
+    Tldr -->|no| NotReady
+    Tldr -->|yes| Recall
+    Recall --> Read
+    Read --> Hit
+    Hit -->|yes| Edge --> Save
+    Hit -->|no| Save
+    Save --> Vault
+    Vault -.->|future recall<br/>surfaces this note| Recall
+
+    classDef action fill:#eff6ff,stroke:#3b82f6,color:#1e3a8a
+    classDef check fill:#fef3c7,stroke:#f59e0b,color:#78350f
+    classDef terminal fill:#ecfdf5,stroke:#10b981,color:#064e3b
+    classDef stop fill:#fee2e2,stroke:#ef4444,color:#7f1d1d
+    class Recall,Read,Edge,Save,Split action
+    class Atomize,Tldr,Hit check
+    class Idea,Vault terminal
+    class NotReady stop
+```
 
 This is not a clean-room design. Each decision has roots in a tradition:
 
