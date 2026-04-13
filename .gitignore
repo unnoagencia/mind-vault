@@ -5,3 +5,5 @@ dist
 coverage
 assets/using-mind-vault.zip
 .worktrees
+.claude/
+.superpowers/
