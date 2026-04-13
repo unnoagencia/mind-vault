@@ -125,12 +125,12 @@ Returns:
 
 - One per note
 - `size = 1 + log(degree + 1)` — degree counts explicit + similarity edges on the node
-- `domain` = first entry in the note's `domains` array (notes can have multiple; we pick the first for coloring). Color determined client-side via deterministic hash → HSL hue in a Midnight Nebula-compatible palette (lavender, cyan, pink, violet range)
+- `domain` = first entry in the note's `domains` CSV field (stored as comma-separated TEXT; we split and pick the first for coloring). Color determined client-side via deterministic hash → HSL hue in a Midnight Nebula-compatible palette (lavender, cyan, pink, violet range)
 - `x`, `y` = precomputed layout coordinates (see below)
 
 ### Edges
 
-- **Explicit**: `SELECT source_id, target_id, why, relation_type FROM links`
+- **Explicit**: `SELECT from_id, to_id, why, relation_type FROM edges` (table is `edges` in the existing schema)
 - **Similarity**: for each note, query Vectorize for top-3 nearest neighbors with `score > 0.75`. Dedupe symmetric pairs. Skip pairs that already have an explicit edge (explicit wins).
 
 ### Layout
