@@ -53,6 +53,22 @@ describe('/app/login', () => {
     expect(res.status).toBe(403);
   });
 
+  it('POST ignores open-redirect next parameter', async () => {
+    const form = new URLSearchParams({
+      email: 'robson@example.com',
+      password: 'correct-horse-battery-staple',
+      next: '/app/..//evil.com',
+    });
+    const res = await SELF.fetch('https://x.test/app/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', origin: 'https://x.test' },
+      body: form.toString(),
+      redirect: 'manual',
+    });
+    expect(res.status).toBe(302);
+    expect(res.headers.get('location')).toBe('/app/notes');
+  });
+
   it('POST /app/logout clears the cookie', async () => {
     const res = await SELF.fetch('https://x.test/app/logout', {
       method: 'POST',

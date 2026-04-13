@@ -50,7 +50,10 @@ export async function handleLoginPost(req: Request, env: Env): Promise<Response>
   }
 
   const token = await signSession(env.OWNER_EMAIL, env.SESSION_SECRET, Math.floor(Date.now() / 1000));
-  const safeNext = next.startsWith('/app/') ? next : '/app/notes';
+  const safeNext =
+    next.startsWith('/app/') && !next.includes('//') && !next.includes('..')
+      ? next
+      : '/app/notes';
   return new Response(null, {
     status: 302,
     headers: {

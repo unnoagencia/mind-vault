@@ -6,9 +6,14 @@ marked.setOptions({
   async: false,
 });
 
+// Drop all raw HTML tokens (block and inline) so no raw HTML survives into output.
+// In marked v18 the renderer receives a token object { text, ... }.
+marked.use({
+  renderer: {
+    html: () => '',
+  },
+});
+
 export function renderMarkdown(src: string): string {
-  // marked escapes raw HTML by default when `sanitize` is unsupported in v12+,
-  // so we wrap manually: strip any <script> just in case, then render.
-  const cleaned = src.replace(/<script[\s\S]*?<\/script>/gi, '');
-  return marked.parse(cleaned, { async: false }) as string;
+  return marked.parse(src, { async: false }) as string;
 }
