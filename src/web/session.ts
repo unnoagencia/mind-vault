@@ -63,3 +63,40 @@ export async function verifySession(
   if (nowSeconds - issuedAt > SESSION_TTL_SECONDS) return null;
   return { email, issuedAt };
 }
+
+import type { Env } from '../env.js';
+
+export function sessionCookie(token: string, opts: { clear?: boolean } = {}): string {
+  const maxAge = opts.clear ? 0 : SESSION_TTL_SECONDS;
+  return `mv_session=${token}; HttpOnly; Secure; SameSite=Lax; Path=/app; Max-Age=${maxAge}`;
+}
+
+export function readCookie(header: string | null, name: string): string | null {
+  if (!header) return null;
+  for (const part of header.split(';')) {
+    const [k, ...rest] = part.trim().split('=');
+    if (k === name) return rest.join('=');
+  }
+  return null;
+}
+
+export type SessionResult =
+  | { ok: true; email: string }
+  | { ok: false; response: Response };
+
+export async function requireSession(req: Request, env: Env): Promise<SessionResult> {
+  if (!env.SESSION_SECRET) {
+    return { ok: false, response: new Response('Session secret not configured', { status: 503 }) };
+  }
+  const token = readCookie(req.headers.get('cookie'), 'mv_session');
+  const url = new URL(req.url);
+  const next = encodeURIComponent(url.pathname + url.search);
+  const redirect = new Response(null, {
+    status: 302,
+    headers: { location: `/app/login?next=${next}` },
+  });
+  if (!token) return { ok: false, response: redirect };
+  const verified = await verifySession(token, env.SESSION_SECRET, Math.floor(Date.now() / 1000));
+  if (!verified) return { ok: false, response: redirect };
+  return { ok: true, email: verified.email };
+}
