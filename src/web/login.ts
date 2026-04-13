@@ -2,21 +2,24 @@ import type { Env } from '../env.js';
 import { esc } from '../util/html.js';
 import { verifyPassword } from '../auth/password.js';
 import { signSession, sessionCookie } from './session.js';
-import { NEBULA_CSS } from './styles.js';
+import { NEBULA_CSS, FONT_LINKS } from './styles.js';
 import { htmlResponse } from './render.js';
 
 function renderLoginPage(error: string | null, next: string): string {
   return `<!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Log in · Mind Vault</title><style>${NEBULA_CSS}</style></head>
+<title>Log in · Mind Vault</title>
+${FONT_LINKS}
+<style>${NEBULA_CSS}</style></head>
 <body><div class="login-wrap">
-<h1>◆ Mind Vault</h1>
+<h1>Mind Vault</h1>
+<p class="subtitle">Your personal latticework of ideas.</p>
 ${error ? `<p class="error">${esc(error)}</p>` : ''}
 <form method="post" action="/app/login">
 <input type="hidden" name="next" value="${esc(next)}">
 <label>Email<input type="email" name="email" required autofocus></label>
 <label>Passphrase<input type="password" name="password" required></label>
-<button type="submit">Log in</button>
+<button type="submit">Enter</button>
 </form></div></body></html>`;
 }
 

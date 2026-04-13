@@ -41,5 +41,4 @@ id = "f9b7d9089728449c8479c2c3c01b6eca"
 
 [[kv_namespaces]]
 binding = "GRAPH_CACHE"
-id = "REPLACE_WITH_KV_ID"
-preview_id = "REPLACE_WITH_KV_ID"
+id = "f27f7e178b2f4ddca9355aded541b3ce"

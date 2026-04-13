@@ -12,15 +12,27 @@ interface NoteListItem {
   updated_at: number;
 }
 
+// updated_at / created_at are stored as milliseconds (Date.now()) — not seconds.
 function formatDate(ts: number): string {
-  return new Date(ts * 1000).toISOString().slice(0, 10);
+  return new Date(ts).toISOString().slice(0, 10);
 }
 
-function domainsToBadges(csv: string): string {
-  return csv
-    .split(',')
-    .map((d) => d.trim())
-    .filter(Boolean)
+// The `domains` column is a JSON-encoded string array (e.g. `["infra","ml"]`).
+// Tolerate legacy CSV just in case some rows were written in the old format.
+function parseDomains(raw: string): string[] {
+  if (!raw) return [];
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('[')) {
+    try {
+      const arr = JSON.parse(trimmed);
+      if (Array.isArray(arr)) return arr.map(String).filter(Boolean);
+    } catch { /* fall through to CSV */ }
+  }
+  return trimmed.split(',').map((d) => d.trim()).filter(Boolean);
+}
+
+function domainsToBadges(raw: string): string {
+  return parseDomains(raw)
     .map((d) => `<span class="badge">${esc(d)}</span>`)
     .join('');
 }
@@ -35,14 +47,17 @@ export async function handleNotesList(req: Request, env: Env): Promise<Response>
   const notes = rows.results ?? [];
 
   const body = `
-    <h1>Notes · ${notes.length}</h1>
+    <div class="page-header">
+      <h1>Notes</h1>
+      <span class="count">${notes.length} ${notes.length === 1 ? 'note' : 'notes'}</span>
+    </div>
     ${notes.length === 0 ? '<p style="color:var(--text-dim)">No notes yet.</p>' : ''}
     ${notes
       .map(
         (n) => `
       <a class="note-card" href="/app/notes/${esc(n.id)}">
         <div class="title">${esc(n.title)}</div>
-        <div class="meta">${domainsToBadges(n.domains)} · ${formatDate(n.updated_at)}</div>
+        <div class="meta">${domainsToBadges(n.domains)}<span>${formatDate(n.updated_at)}</span></div>
       </a>`
       )
       .join('')}
@@ -96,7 +111,7 @@ export async function handleNoteDetail(req: Request, env: Env, id: string): Prom
 
   const body = `
     <h1>${esc(note.title)}</h1>
-    <div class="meta" style="margin-bottom:24px">${domainsToBadges(note.domains)} · Updated ${formatDate(note.updated_at)}</div>
+    <div class="meta" style="margin-bottom:32px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">${domainsToBadges(note.domains)}<span>Updated ${formatDate(note.updated_at)}</span></div>
     <div class="note-body">${renderMarkdown(note.body)}</div>
     ${linksHtml}
   `;

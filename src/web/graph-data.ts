@@ -17,8 +17,8 @@ export interface GraphPayload {
 }
 
 const CACHE_KEY = 'graph:v1';
-const SIMILARITY_TOP_K = 3;
-const SIMILARITY_MIN_SCORE = 0.75;
+const SIMILARITY_TOP_K = 4;
+const SIMILARITY_MIN_SCORE = 0.55;
 
 async function computeSourceHash(env: Env): Promise<string> {
   const n = await env.DB.prepare(`SELECT COALESCE(MAX(updated_at), 0) m, COUNT(*) c FROM notes`).first<{ m: number; c: number }>();
@@ -26,8 +26,18 @@ async function computeSourceHash(env: Env): Promise<string> {
   return `n${n?.m ?? 0}x${n?.c ?? 0}_e${e?.m ?? 0}x${e?.c ?? 0}`;
 }
 
-function firstDomain(csv: string): string {
-  const first = csv.split(',')[0]?.trim();
+// Domains are stored as a JSON-encoded string array. Parse and pick the first
+// entry for node coloring; fall back to CSV split for legacy rows.
+function firstDomain(raw: string): string {
+  if (!raw) return 'misc';
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('[')) {
+    try {
+      const arr = JSON.parse(trimmed);
+      if (Array.isArray(arr) && arr.length > 0) return String(arr[0]).trim() || 'misc';
+    } catch { /* fall through */ }
+  }
+  const first = trimmed.split(',')[0]?.trim();
   return first || 'misc';
 }
 
