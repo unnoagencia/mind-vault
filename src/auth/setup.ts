@@ -1,6 +1,6 @@
 import type { Env } from '../env.js';
 import { runMigrations } from '../db/migrate.js';
-import { renderLanding, renderWizard } from '../static/wizard.js';
+import { renderLanding, renderNotConfigured } from '../static/wizard.js';
 
 export function isSetup(env: Env): boolean {
   return Boolean(env.OWNER_EMAIL && env.OWNER_PASSWORD_HASH && env.SESSION_SECRET);
@@ -50,7 +50,7 @@ export async function getVaultStatus(env: Env): Promise<{
 
 export async function handleRoot(_req: Request, env: Env): Promise<Response> {
   if (!isSetup(env)) {
-    return new Response(renderWizard(), { headers: { 'content-type': 'text/html; charset=utf-8' } });
+    return new Response(renderNotConfigured(), { headers: { 'content-type': 'text/html; charset=utf-8' } });
   }
   const status = await getVaultStatus(env);
   return new Response(renderLanding(status), {

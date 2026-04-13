@@ -232,6 +232,15 @@ async function main() {
   let physicsUntil = 0;
   let rafHandle = 0;
 
+  // Force Sigma to re-fit its camera to whatever bbox the graph currently has.
+  // Without this, the camera stays zoomed on the initial ±1 cluster and the
+  // nodes that force-atlas2 pushes outward fall off the right edge of the
+  // viewport (they're still drawn, just outside the visible area).
+  function refitCamera() {
+    renderer.refresh();
+    renderer.getCamera().setState({ x: 0.5, y: 0.5, angle: 0, ratio: 1.1 });
+  }
+
   function runPhysics(durationMs: number) {
     physicsUntil = Math.max(physicsUntil, Date.now() + durationMs);
     if (rafHandle) return;
@@ -262,10 +271,15 @@ async function main() {
         graph.setNodeAttribute(drag.node, 'y', drag.pointer.y);
       }
 
+      // Keep the camera fitting the expanding bbox during reveal — otherwise
+      // nodes fly outside the initial viewport as they explode outward.
+      if (!drag) refitCamera();
+
       if (Date.now() < physicsUntil || drag) {
         rafHandle = requestAnimationFrame(loop);
       } else {
         rafHandle = 0;
+        refitCamera();
       }
     };
     rafHandle = requestAnimationFrame(loop);

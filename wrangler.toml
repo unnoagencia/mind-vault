@@ -3,16 +3,20 @@ main = "src/index.ts"
 compatibility_date = "2025-02-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Custom domain — Cloudflare auto-provisions DNS + SSL.
-# The domain's zone must be on the same Cloudflare account.
-[[routes]]
-pattern = "mind.robsonlins.com"
-custom_domain = true
+# ──────────────────────────────────────────────────────────────────────────────
+# Mind Vault — shared wrangler config (placeholders)
+#
+# This file is committed. Replace the REPLACE_ME_* placeholders with the IDs
+# your agent (or you) creates in step 2 of CLAUDE.md. If you need a private
+# override for your own environment (custom domain, real IDs without editing
+# this file), create wrangler.local.toml — it is gitignored — and run wrangler
+# with: `wrangler deploy --config wrangler.local.toml`.
+# ──────────────────────────────────────────────────────────────────────────────
 
 [[d1_databases]]
 binding = "DB"
 database_name = "mind-vault"
-database_id = "0707d49a-d76e-40dd-8b0c-24186f8e9d3e"
+database_id = "REPLACE_ME_D1_ID"
 migrations_dir = "src/db/migrations"
 
 [[vectorize]]
@@ -37,8 +41,8 @@ binding = "ASSETS"
 
 [[kv_namespaces]]
 binding = "OAUTH_KV"
-id = "f9b7d9089728449c8479c2c3c01b6eca"
+id = "REPLACE_ME_OAUTH_KV_ID"
 
 [[kv_namespaces]]
 binding = "GRAPH_CACHE"
-id = "f27f7e178b2f4ddca9355aded541b3ce"
+id = "REPLACE_ME_GRAPH_CACHE_ID"

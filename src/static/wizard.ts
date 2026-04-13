@@ -22,138 +22,37 @@ const FOOTER_HTML = `
   <a href="https://youtube.com/@orobsonnn" target="_blank">YouTube</a>
 </div>`;
 
-const MCP_URL_SCRIPT = `<script>
-  (function () {
-    const url = location.origin + '/mcp';
-    const urlEl = document.getElementById('mcp-url');
-    if (urlEl) urlEl.textContent = url;
-    const codeEl = document.getElementById('code-add');
-    if (codeEl) codeEl.textContent = 'claude mcp add --transport http mind-vault ' + url;
-  })();
-<\/script>`;
-
-export function renderWizard(): string {
+export function renderNotConfigured(): string {
   return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Mind Vault — Setup</title>
+  <title>Mind Vault — Not configured</title>
   <style>${BASE_CSS}</style>
 </head>
 <body>
 <main>
   <h1>Mind Vault</h1>
-  <p>Set up your personal knowledge graph in 5 steps.</p>
+  <p style="color:#a7adb5">Worker is deployed, but the vault is not configured yet.</p>
 
   <div class="card">
-    <h2>1. Credentials</h2>
-    <p>Set the email and passphrase you will use to authorize Claude to access the vault.</p>
-    <form method="post" action="/setup/credentials">
-      <p><label>Email<br><input type="email" name="email" required placeholder="you@example.com"></label></p>
-      <p><label>Passphrase<br><input type="password" name="password" required placeholder="long memorable phrase"></label></p>
-      <p><label>Confirm passphrase<br><input type="password" name="password_confirm" required placeholder="repeat the passphrase"></label></p>
-      <button type="submit">Save credentials</button>
-    </form>
-  </div>
-
-  <div class="card">
-    <h2>2. Provisioning</h2>
-    <p>Applies the Mind Vault schema to your D1 database (tables <code>notes</code>, <code>edges</code>, <code>tags</code>, FTS5 and triggers). Idempotent — safe to click multiple times.</p>
-    <p style="color:#a7adb5;font-size:13px">The Vectorize index <code>mind-vault-embeddings</code> and the KV namespace <code>OAUTH_KV</code> are provisioned separately, before the first <code>wrangler deploy</code>, via CLI: <code>wrangler vectorize create mind-vault-embeddings --dimensions=1024 --metric=cosine</code> and <code>wrangler kv namespace create OAUTH_KV</code>. If you deployed via the "Deploy to Cloudflare" button in the README, Cloudflare already created everything from the <code>wrangler.toml</code> bindings.</p>
-    <button id="btn-provision" onclick="provision(this)">Provision database</button>
-    <p id="provision-status" style="display:none;color:#4caf50">Schema applied successfully!</p>
-    <script>
-      async function provision(btn) {
-        btn.disabled = true;
-        const r = await fetch('/setup/provision', { method: 'POST' });
-        const j = await r.json();
-        if (j.ok) {
-          document.getElementById('provision-status').style.display = '';
-          btn.textContent = 'Provisioned ✓';
-        } else {
-          btn.disabled = false;
-          alert('Provisioning error: ' + JSON.stringify(j));
-        }
-      }
-    <\/script>
-  </div>
-
-  <div class="card">
-    <h2>3. Connect to Claude</h2>
-    <p>MCP server URL:</p>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <code id="mcp-url" style="flex:1;min-width:280px">/mcp</code>
-      <button type="button" onclick="copyMcpUrl(this)">Copy URL</button>
-    </div>
-    <div class="tabs" style="margin-top:16px">
-      <div class="tab active" onclick="showTab(this,'code')">Claude Code</div>
-      <div class="tab" onclick="showTab(this,'ui')">Claude Desktop / Web</div>
-    </div>
-    <div id="tab-code">
-      <p>Run in the terminal (the command already includes this Worker URL):</p>
-      <pre id="code-add">claude mcp add --transport http mind-vault &lt;URL&gt;</pre>
-      <button type="button" onclick="copyCodeCmd(this)">Copy command</button>
-    </div>
-    <div id="tab-ui" style="display:none">
-      <p>Claude Desktop and Claude Web use the same flow — both plug in a remote MCP via the Connectors UI:</p>
-      <ol>
-        <li>Open <strong>Claude Desktop</strong> or <a href="https://claude.ai" target="_blank">claude.ai</a>.</li>
-        <li>Go to <strong>Settings → Connectors</strong> (older versions: <em>Integrations</em>).</li>
-        <li>Click <strong>Add custom connector</strong> (or <em>Add MCP server</em>).</li>
-        <li>Paste the URL above into the <em>URL</em> field and give it a name (e.g. <code>mind-vault</code>).</li>
-        <li>Claude will open an OAuth window — log in with the email + passphrase you set in step 1.</li>
-      </ol>
-      <p style="color:#a7adb5;font-size:13px">Note: Claude automatically detects that this is an MCP server with OAuth 2.1 + dynamic client registration, so the only piece of data you need to paste is the URL.</p>
-    </div>
-    <script>
-      function showTab(el, id) {
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        el.classList.add('active');
-        ['code','ui'].forEach(t => {
-          document.getElementById('tab-' + t).style.display = t === id ? '' : 'none';
-        });
-      }
-      function copyMcpUrl(btn) {
-        navigator.clipboard.writeText(document.getElementById('mcp-url').textContent.trim());
-        flash(btn);
-      }
-      function copyCodeCmd(btn) {
-        const url = document.getElementById('mcp-url').textContent.trim();
-        navigator.clipboard.writeText('claude mcp add --transport http mind-vault ' + url);
-        flash(btn);
-      }
-      function flash(btn) {
-        const original = btn.textContent;
-        btn.textContent = 'Copied ✓';
-        setTimeout(() => { btn.textContent = original; }, 1500);
-      }
-    <\/script>
-  </div>
-
-  <div class="card">
-    <h2>4. Install the Skill</h2>
-    <p>Download the skill ZIP and install it in Claude:</p>
-    <p><a href="/skill/using-mind-vault.zip" download>⬇ using-mind-vault.zip</a></p>
-    <p><strong>Claude Code:</strong> extract to <code>~/.claude/skills/</code></p>
-    <p><strong>Claude Desktop / Web:</strong> Settings → Skills → Import and select the ZIP file.</p>
-  </div>
-
-  <div class="card">
-    <h2>5. Personalize Claude</h2>
-    <p>Paste the block below into Settings → Personalization → Custom instructions:</p>
-    <pre id="prefs">${PREFS_BLOCK}</pre>
-    <button onclick="copyPrefs()">Copy</button>
-    <script>
-      function copyPrefs() {
-        navigator.clipboard.writeText(document.getElementById('prefs').textContent.trim());
-      }
-    <\/script>
+    <h2>Finish setup from your agentic IDE</h2>
+    <p>Mind Vault is configured by the agent, not by a web wizard. Open the repo in Claude Code (or any MCP-capable IDE) and ask it to set up Mind Vault — it will follow the checklist in <code>CLAUDE.md</code> at the repo root.</p>
+    <p>The agent will:</p>
+    <ul>
+      <li>Provision D1, Vectorize and the two KV namespaces</li>
+      <li>Update <code>wrangler.toml</code> with the new IDs</li>
+      <li>Prompt you for an email + passphrase</li>
+      <li>Hash the passphrase and generate a <code>SESSION_SECRET</code></li>
+      <li>Push the three secrets with <code>wrangler secret put</code></li>
+      <li>Run <code>wrangler deploy</code> and apply the D1 schema</li>
+    </ul>
+    <p>The only thing you type is the email and the passphrase.</p>
   </div>
 
   ${FOOTER_HTML}
 </main>
-${MCP_URL_SCRIPT}
 </body>
 </html>`;
 }

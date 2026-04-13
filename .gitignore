@@ -1,6 +1,7 @@
 node_modules
 .wrangler
 .dev.vars
+wrangler.local.toml
 dist
 coverage
 assets/using-mind-vault.zip
