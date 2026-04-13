@@ -7,6 +7,7 @@ export interface Env {
   OWNER_PASSWORD_HASH?: string;
   SESSION_SECRET?: string;
   OAUTH_KV: KVNamespace;
+  GRAPH_CACHE: KVNamespace;
   MCP_OBJECT: DurableObjectNamespace;
 }
 
