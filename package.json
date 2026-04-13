@@ -5,11 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "npm run build:skill && wrangler deploy",
+    "build:bundle": "tsx scripts/build-graph-bundle.ts",
+    "deploy": "npm run build:skill && npm run build:bundle && wrangler deploy",
     "build:skill": "tsx scripts/build-skill-zip.ts",
     "test": "vitest run && vitest run --config vitest.auth.config.ts",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p src/web/client/tsconfig.json"
   },
   "dependencies": {
     "@cloudflare/workers-oauth-provider": "^0.0.5",
