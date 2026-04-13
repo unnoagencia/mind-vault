@@ -3,10 +3,16 @@ import { handleRoot, handleProvision, handleStatus, isSetup } from './setup.js';
 import { hashPassword, verifyPassword } from './password.js';
 import { BASE_CSS } from '../static/styles.js';
 import { esc } from '../util/html.js';
+import { handleApp } from '../web/handler.js';
 
 export const authHandler = {
   async fetch(req: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
+
+    if (url.pathname.startsWith('/app')) {
+      const res = await handleApp(req, env);
+      if (res) return res;
+    }
 
     if (url.pathname === '/') return handleRoot(req, env);
     if (url.pathname === '/status') return handleStatus(env);
@@ -56,8 +62,16 @@ async function handleCredentials(req: Request): Promise<Response> {
   if (password !== password2) return renderCredentialsError('Confirmation does not match the passphrase.');
 
   const hash = await hashPassword(password);
+
+  // Generate a 32-byte session secret (hex) for the web dashboard cookie signing.
+  const secretBytes = new Uint8Array(32);
+  crypto.getRandomValues(secretBytes);
+  const sessionSecret = Array.from(secretBytes, (b) => b.toString(16).padStart(2, '0')).join('');
+
   const emailCmd = `wrangler secret put OWNER_EMAIL`;
   const hashCmd = `wrangler secret put OWNER_PASSWORD_HASH`;
+  const secretCmd = `wrangler secret put SESSION_SECRET`;
+  const kvCmd = `wrangler kv namespace create GRAPH_CACHE`;
 
   return new Response(
     `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mind Vault — Credentials</title><style>${BASE_CSS}</style></head>
@@ -82,8 +96,23 @@ async function handleCredentials(req: Request): Promise<Response> {
   </div>
 
   <div class="card">
-    <h2>3. Redeploy</h2>
-    <p>After running both <code>wrangler secret put</code> commands, run <code>wrangler deploy</code> once so the Worker picks up the new secrets. The next visit to the home page will show the vault status instead of this wizard, and <code>/authorize</code> will render the login screen instead of "Vault not configured".</p>
+    <h2>3. Session secret (web dashboard cookie signing)</h2>
+    <p>Command: <code>${esc(secretCmd)}</code></p>
+    <p>Value:</p>
+    <pre id="secret-value">${esc(sessionSecret)}</pre>
+    <button type="button" data-copy="secret-value">Copy secret</button>
+  </div>
+
+  <div class="card">
+    <h2>4. Graph cache KV namespace</h2>
+    <p>Create the namespace:</p>
+    <pre>${esc(kvCmd)}</pre>
+    <p>Wrangler prints an <code>id</code>. Paste it into <code>wrangler.toml</code> replacing both <code>REPLACE_WITH_KV_ID</code> placeholders in the <code>[[kv_namespaces]]</code> block with <code>binding = "GRAPH_CACHE"</code>.</p>
+  </div>
+
+  <div class="card">
+    <h2>5. Redeploy</h2>
+    <p>After running all three <code>wrangler secret put</code> commands and updating <code>wrangler.toml</code> with the KV ID, run <code>wrangler deploy</code> once so the Worker picks up everything. The next visit to <code>/app</code> will redirect you to the dashboard login.</p>
   </div>
 
   <p><a href="/">← Back to wizard</a></p>

@@ -38,3 +38,7 @@ binding = "ASSETS"
 [[kv_namespaces]]
 binding = "OAUTH_KV"
 id = "f9b7d9089728449c8479c2c3c01b6eca"
+
+[[kv_namespaces]]
+binding = "GRAPH_CACHE"
+id = "f27f7e178b2f4ddca9355aded541b3ce"

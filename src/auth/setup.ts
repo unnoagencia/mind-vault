@@ -3,7 +3,7 @@ import { runMigrations } from '../db/migrate.js';
 import { renderLanding, renderWizard } from '../static/wizard.js';
 
 export function isSetup(env: Env): boolean {
-  return Boolean(env.OWNER_EMAIL && env.OWNER_PASSWORD_HASH);
+  return Boolean(env.OWNER_EMAIL && env.OWNER_PASSWORD_HASH && env.SESSION_SECRET);
 }
 
 async function countKvPrefix(env: Env, prefix: string): Promise<number> {
