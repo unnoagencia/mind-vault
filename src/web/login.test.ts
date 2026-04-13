@@ -12,10 +12,8 @@ describe('/app/login', () => {
   });
 
   it('POST with correct credentials sets mv_session cookie', async () => {
-    (env as any).OWNER_EMAIL = 'robson@example.com';
-    (env as any).OWNER_PASSWORD_HASH = await hashPassword('correct-horse-battery-staple');
-    (env as any).SESSION_SECRET = 'test-secret-0123456789abcdef0123456789abcdef';
-
+    // OWNER_EMAIL, OWNER_PASSWORD_HASH, SESSION_SECRET are pre-configured in vitest.config.ts miniflare bindings.
+    // The hash corresponds to 'correct-horse-battery-staple' (PBKDF2-SHA256, fixed salt).
     const form = new URLSearchParams({ email: 'robson@example.com', password: 'correct-horse-battery-staple' });
     const res = await SELF.fetch('https://x.test/app/login', {
       method: 'POST',
@@ -31,9 +29,8 @@ describe('/app/login', () => {
   });
 
   it('POST with wrong password returns 401', async () => {
-    (env as any).OWNER_EMAIL = 'robson@example.com';
-    (env as any).OWNER_PASSWORD_HASH = await hashPassword('right-password');
-    (env as any).SESSION_SECRET = 'test-secret-0123456789abcdef0123456789abcdef';
+    // OWNER_EMAIL, OWNER_PASSWORD_HASH, SESSION_SECRET are pre-configured in vitest.config.ts miniflare bindings.
+    // Posting 'wrong' against the pre-configured hash will fail verification → 401.
     const form = new URLSearchParams({ email: 'robson@example.com', password: 'wrong' });
     const res = await SELF.fetch('https://x.test/app/login', {
       method: 'POST',
