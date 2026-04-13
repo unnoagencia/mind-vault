@@ -3,10 +3,16 @@ import { handleRoot, handleProvision, handleStatus, isSetup } from './setup.js';
 import { hashPassword, verifyPassword } from './password.js';
 import { BASE_CSS } from '../static/styles.js';
 import { esc } from '../util/html.js';
+import { handleApp } from '../web/handler.js';
 
 export const authHandler = {
   async fetch(req: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
+
+    if (url.pathname.startsWith('/app')) {
+      const res = await handleApp(req, env);
+      if (res) return res;
+    }
 
     if (url.pathname === '/') return handleRoot(req, env);
     if (url.pathname === '/status') return handleStatus(env);
